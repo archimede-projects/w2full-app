@@ -428,18 +428,13 @@ I nomi definitivi dei secrets e il flusso esatto verranno documentati in `PROJEC
 
 - Repository `archimede-projects/w2full-app` verificata pubblica e scrivibile.
 - Aggiunti `PROJECT_SPEC.md`, `README.md`, `LICENSE` MIT e `.gitignore` Android.
-- Verificata nuovamente la fonte ufficiale MIMIT: dal 10 febbraio 2026 il separatore dei file Anagrafica alle 8 e Prezzi alle 8 è `|`.
-- Confermati dalla pagina ufficiale gli URL correnti dei due CSV; saranno ricontrollati prima dell'implementazione M3.
-- Nessun codice Android, workflow CI o branch temporaneo introdotto in M0.
-- Definito nome progetto/app: **W2Full**.
-- Definito nome repository previsto: `w2full-app`.
+- Definito nome progetto/app: **W2Full** e repository `w2full-app`.
 - Definiti vincoli di gratuità, assenza account/cloud/backend e distribuzione via APK/GitHub Releases.
 - Definita architettura: Compose/Material 3, MVVM + Repository, StateFlow, Room, OkHttp, WorkManager, FusedLocationProviderClient, Haversine, NotificationCompat.
 - Definito modello dati concettuale iniziale.
 - Definita roadmap M0–M6.
-- Verificati gli URL diretti correnti dei CSV MIMIT.
-- Verificato l'avviso MIMIT: separatore `|` in vigore dal 10 febbraio 2026 per anagrafica/prezzi alle 8.
-- Nessun codice applicativo introdotto.
+- Verificata nuovamente la fonte ufficiale MIMIT, inclusi gli URL correnti dei CSV e il separatore `|` in vigore dal 10 febbraio 2026 per anagrafica/prezzi alle 8.
+- Nessun codice Android, workflow CI o branch temporaneo introdotto in M0.
 
 ## 10. Decisioni aperte
 
