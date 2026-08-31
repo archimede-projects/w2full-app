@@ -63,11 +63,11 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [ ] GitHub Releases per APK debug.
 
 ### Design
-- [~] Direzione visiva iniziale.
-- [~] 4 concept logo/icona 1024×1024 in `design/logo/`.
-- [~] Home: 2 varianti statiche.
-- [~] Registro rifornimenti: 2 varianti statiche.
-- [~] Storico prezzi: 2 varianti statiche.
+- [~] Direzione visiva iniziale: **in review**.
+- [x] 4 concept logo/icona 1024×1024 in `design/logo/`.
+- [x] Home: 2 varianti statiche.
+- [x] Registro rifornimenti: 2 varianti statiche.
+- [x] Storico prezzi: 2 varianti statiche.
 - [ ] Scelta finale della direzione visiva prima di M2.
 
 ### Registro e calcoli
@@ -91,16 +91,18 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 Stato: **[x] fatto**
 
 ### M1 — Design: logo e mockup
-Stato: **[~] in corso**
+Stato: **[~] in corso — asset pronti, scelta visuale in attesa**
 
 Deliverable:
-- 3-4 concept logo/icona W2Full con canvas **1024×1024**, in `design/logo/`;
-- mockup statici Home, Registro rifornimenti e Storico prezzi, due temi per schermata, in `design/mockup/`;
-- nessun codice app;
-- sezione Design con palette, tipografia e percorsi;
-- review umana prima di M2.
+- [x] 4 concept logo/icona W2Full con canvas **1024×1024**, in `design/logo/`;
+- [x] 2 mockup statici Home in `design/mockup/`;
+- [x] 2 mockup statici Registro rifornimenti in `design/mockup/`;
+- [x] 2 mockup statici Storico prezzi in `design/mockup/`;
+- [x] nessun codice app introdotto;
+- [x] sezione Design con palette, tipografia e percorsi;
+- [ ] review umana e scelta direzione prima di M2.
 
-Gli asset sono SVG statici/vettoriali: i logo dichiarano `width="1024" height="1024" viewBox="0 0 1024 1024"`.
+Gli asset sono SVG statici/vettoriali; i logo dichiarano `width="1024" height="1024" viewBox="0 0 1024 1024"`.
 
 ### M2 — Scheletro Android + CI con APK installabile
 Stato: **[ ] da fare**
@@ -145,10 +147,10 @@ Direzione: chiara, leggibile, editoriale.
 
 ### Percorsi asset
 Logo:
-- `design/logo/w2full-logo-concept-01.svg`
-- `design/logo/w2full-logo-concept-02.svg`
-- `design/logo/w2full-logo-concept-03.svg`
-- `design/logo/w2full-logo-concept-04.svg`
+- `design/logo/w2full-logo-concept-01.svg` — gauge / indicatore carburante.
+- `design/logo/w2full-logo-concept-02.svg` — monogramma W2F + goccia.
+- `design/logo/w2full-logo-concept-03.svg` — pompa carburante + wordmark.
+- `design/logo/w2full-logo-concept-04.svg` — strada + goccia in badge circolare.
 
 Mockup:
 - `design/mockup/home-theme-petrol-night.svg`
@@ -176,12 +178,16 @@ Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equ
 
 ## 10. Changelog
 
-### 2026-08-31 — M1 Design avviata
-- Inserita M1 Design prima dello scheletro Android e rinumerate le milestone tecniche fino a M7.
-- Aggiornati i riferimenti MIMIT/CI/grafici alla nuova numerazione.
-- Aggiunta sezione Design con due palette, tipografia e percorsi asset.
-- Scelto SVG come formato statico/vettoriale per gli asset M1; i logo hanno canvas 1024×1024.
+### 2026-08-31 — M1 Design: asset pronti per review
+- Committati 4 concept logo/icona SVG 1024×1024.
+- Committati 6 mockup statici: Home, Registro rifornimenti e Storico prezzi in Petrol Night e Road Light.
+- M1 resta in corso fino alla scelta umana della direzione visuale.
 - Nessun codice applicativo introdotto.
+
+### 2026-08-31 — M1 Design avviata
+- Inserita M1 Design prima dello scheletro Android e rinumerate le milestone fino a M7.
+- Aggiornati i riferimenti MIMIT/CI/grafici alla nuova numerazione.
+- Aggiunta sezione Design con palette, tipografia e percorsi asset.
 
 ### 2026-08-31 — M0 completata
 - Repository pubblica e scrivibile.
