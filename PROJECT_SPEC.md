@@ -191,7 +191,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 
 ### Fondazioni progetto
 
-- [~] Repository pubblica `w2full-app` e documentazione iniziale M0.
+- [x] Repository pubblica `w2full-app` e documentazione iniziale M0.
 - [ ] Scheletro Android Kotlin + Jetpack Compose + Material 3.
 - [ ] Pipeline GitHub Actions che esegue test/build e produce un APK reale.
 - [ ] Firma debug con keystore persistente ricostruito da GitHub Actions secrets.
@@ -251,7 +251,7 @@ La roadmap proposta viene mantenuta perché separa bene le dipendenze: prima la 
 
 ### M0 — Repo + spec
 
-Stato: **[~] in corso**
+Stato: **[x] fatto**
 
 Deliverable:
 
@@ -424,8 +424,13 @@ I nomi definitivi dei secrets e il flusso esatto verranno documentati in `PROJEC
 
 ## 9. Changelog
 
-### 2026-08-31 — M0 avviata
+### 2026-08-31 — M0 completata
 
+- Repository `archimede-projects/w2full-app` verificata pubblica e scrivibile.
+- Aggiunti `PROJECT_SPEC.md`, `README.md`, `LICENSE` MIT e `.gitignore` Android.
+- Verificata nuovamente la fonte ufficiale MIMIT: dal 10 febbraio 2026 il separatore dei file Anagrafica alle 8 e Prezzi alle 8 è `|`.
+- Confermati dalla pagina ufficiale gli URL correnti dei due CSV; saranno ricontrollati prima dell'implementazione M3.
+- Nessun codice Android, workflow CI o branch temporaneo introdotto in M0.
 - Definito nome progetto/app: **W2Full**.
 - Definito nome repository previsto: `w2full-app`.
 - Definiti vincoli di gratuità, assenza account/cloud/backend e distribuzione via APK/GitHub Releases.
