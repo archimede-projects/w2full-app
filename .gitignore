@@ -1,0 +1,41 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Generated Android files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing / secrets
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
+
+# Kotlin / tooling
+.kotlin/
+
+# APK / bundles
+*.apk
+*.aab
+
+# Firebase / Google services (not currently used; keep local if ever introduced)
+google-services.json
