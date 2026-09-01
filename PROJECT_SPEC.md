@@ -142,6 +142,8 @@ Secrets M2:
 - `W2FULL_DEBUG_KEY_ALIAS` — alias della chiave;
 - `W2FULL_DEBUG_KEY_PASSWORD` — password della chiave.
 
+I quattro repository secret sono stati configurati il **1 settembre 2026**. La configurazione resta da validare tramite due run GitHub Actions indipendenti: entrambi devono eseguire `Restore persistent debug keystore` con esito `success` e produrre APK con lo stesso SHA-256 del certificato di firma.
+
 Deliverable:
 - [~] scheletro Kotlin + Compose/Material 3 con tema Petrol Night;
 - [~] package/applicationId `com.archimede.w2full`;
@@ -149,7 +151,7 @@ Deliverable:
 - [~] test JVM minimo;
 - [~] workflow GitHub Actions con JDK 17, Gradle 9.5.0 pinning, test, `assembleDebug`, verifica e upload APK;
 - [~] firma debug persistente tramite i quattro secret definiti sopra;
-- [ ] verifica reale di almeno un workflow riuscito con APK installabile firmato con il keystore persistente.
+- [ ] verifica reale di due workflow indipendenti riusciti con APK installabili e identico SHA-256 del certificato persistente.
 
 ### M3 — Registro rifornimenti + calcoli
 Stato: **[ ] da fare**
@@ -232,9 +234,14 @@ Toolchain M2: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa
 
 La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato nei log o committato.
 
-Finché i quattro secret non sono configurati, la CI può validare codice/test e produrre un APK debug con la chiave debug effimera standard del runner, ma **M2 non può essere chiusa**: la chiusura richiede un run verificato che utilizzi il keystore persistente.
+Dal **1 settembre 2026** i quattro secret risultano configurati dal proprietario del repository. Prima di chiudere M2 la CI deve confermare in due run indipendenti che il ripristino del keystore avviene realmente e che lo SHA-256 del certificato di firma resta identico tra i due APK.
 
 ## 10. Changelog
+
+### 2026-09-01 — M2: secrets configurati, verifica firma avviata
+- Registrata la configurazione dei quattro GitHub Actions Secrets per il keystore debug persistente.
+- Avviata la verifica obbligatoria su due run indipendenti: `Restore persistent debug keystore` deve risultare `success` in entrambi.
+- La chiusura M2 richiede inoltre che `apksigner` riporti lo stesso SHA-256 del certificato nei due APK.
 
 ### 2026-09-01 — M2 avviata: toolchain e firma definite
 - Confermato `applicationId`/namespace `com.archimede.w2full`.
@@ -278,21 +285,3 @@ Finché i quattro secret non sono configurati, la CI può validare codice/test e
 - Inserita M1 Design prima dello scheletro Android e rinumerate le milestone fino a M7.
 - Aggiornati i riferimenti MIMIT/CI/grafici alla nuova numerazione.
 - Aggiunta sezione Design con palette, tipografia e percorsi asset.
-
-### 2026-08-31 — M0 completata
-- Repository pubblica e scrivibile.
-- Aggiunti spec, README, MIT license e gitignore Android.
-- Definiti nome, vincoli, architettura, modello dati e roadmap iniziale.
-- Verificata fonte MIMIT, URL correnti e separatore `|`.
-- Nessun codice Android, workflow CI o branch temporaneo introdotto.
-
-## 11. Decisioni aperte
-
-- versionamento/naming GitHub Releases e trigger Release;
-- semantica autonomia e unità consumo;
-- rifornimenti parziali;
-- raggio e ordinamento stazioni;
-- permessi posizione minimali;
-- retention storico prezzi;
-- libreria grafici definitiva in M5;
-- schema CSV in M7.
