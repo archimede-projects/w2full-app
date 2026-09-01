@@ -14,8 +14,8 @@ android {
         applicationId = "com.archimede.w2full"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0-m3"
+        versionCode = 3
+        versionName = "0.3.0-m4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -70,6 +70,7 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.08.00")
     val roomVersion = "2.8.4"
     val lifecycleVersion = "2.11.0"
+    val okhttpVersion = "5.5.0"
 
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.13.0")
@@ -83,10 +84,13 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
+    implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.room:room-testing:$roomVersion")
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver3:$okhttpVersion")
 }

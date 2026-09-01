@@ -6,6 +6,7 @@ on:
       - main
       - m2-android-scaffold
       - m3-refueling-register
+      - m4-mimit-csv
   workflow_dispatch:
 
 permissions:
