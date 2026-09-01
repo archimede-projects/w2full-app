@@ -1,0 +1,80 @@
+name: Android CI
+
+on:
+  push:
+    branches:
+      - main
+      - m2-android-scaffold
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    env:
+      W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
+      W2FULL_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEYSTORE_PASSWORD }}
+      W2FULL_DEBUG_KEY_ALIAS: ${{ secrets.W2FULL_DEBUG_KEY_ALIAS }}
+      W2FULL_DEBUG_KEY_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.0"
+
+      - name: Restore persistent debug keystore
+        if: ${{ env.W2FULL_DEBUG_KEYSTORE_BASE64 != '' && env.W2FULL_DEBUG_KEYSTORE_PASSWORD != '' && env.W2FULL_DEBUG_KEY_ALIAS != '' && env.W2FULL_DEBUG_KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/w2full-debug.keystore"
+          printf '%s' "$W2FULL_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "W2FULL_DEBUG_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Report signing mode
+        shell: bash
+        run: |
+          if [[ -n "${W2FULL_DEBUG_KEYSTORE_BASE64}" && -n "${W2FULL_DEBUG_KEYSTORE_PASSWORD}" && -n "${W2FULL_DEBUG_KEY_ALIAS}" && -n "${W2FULL_DEBUG_KEY_PASSWORD}" ]]; then
+            echo "Persistent debug keystore enabled."
+          else
+            echo "::warning::Persistent debug signing secrets are not fully configured; this run will use Gradle's ephemeral default debug key."
+          fi
+
+      - name: Run JVM tests
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK and signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          ls -lh "$APK"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: w2full-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
