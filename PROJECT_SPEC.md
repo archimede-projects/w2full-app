@@ -42,10 +42,28 @@ Obiettivi: registro rifornimenti; consumo medio, costo/km e autonomia residua; i
 ## 4. Modello dati
 
 ### Veicolo
-`id`, nome, carburante predefinito, capacità serbatoio, riferimento odometrico e metadati futuri. V1: un solo veicolo attivo.
+In M3 viene introdotta una configurazione Room minima per il singolo veicolo V1, tabella `vehicles`: `id: Long` chiave primaria non autogenerata (V1 usa sempre `1`), `name: String`, `defaultFuelType: String`, `tankCapacityMilliliters: Long?`. La capacità può restare `null` finché non viene configurata; in tal caso l'autonomia residua è intenzionalmente non disponibile. Nessun CRUD multi-veicolo in M3.
 
-### Rifornimento
-`id`, `veicoloId`, data, km attuali, litri, costo totale, tipo carburante. Estensioni future: prezzo/litro, pieno, note, impianto.
+### Rifornimento — schema Room M3 definitivo
+Tabella: `refuel_entries`.
+
+Campi e mapping SQLite/Room:
+- `id: Long` → `INTEGER`, `@PrimaryKey(autoGenerate = true)`;
+- `vehicleId: Long` → colonna `vehicle_id INTEGER NOT NULL`, foreign key verso `vehicles.id`, `ON DELETE CASCADE`;
+- `timestampEpochMillis: Long` → colonna `timestamp_epoch_millis INTEGER NOT NULL`, istante del rifornimento in epoch milliseconds UTC;
+- `odometerKm: Long` → colonna `odometer_km INTEGER NOT NULL`, chilometri totali indicati dal contachilometri;
+- `litersMilliliters: Long` → colonna `liters_milliliters INTEGER NOT NULL`, quantità acquistata espressa in millilitri per evitare errori binari di persistenza;
+- `totalCostCents: Long` → colonna `total_cost_cents INTEGER NOT NULL`, costo totale in centesimi di euro;
+- `fuelType: String` → colonna `fuel_type TEXT NOT NULL`, etichetta carburante normalizzata lato dominio;
+- `isFullTank: Boolean` → colonna `is_full_tank INTEGER NOT NULL`, `true` se il serbatoio è stato riportato a pieno dopo quel rifornimento.
+
+Indici non univoci:
+- `idx_refuel_vehicle_odometer` su (`vehicle_id`, `odometer_km`);
+- `idx_refuel_vehicle_timestamp` su (`vehicle_id`, `timestamp_epoch_millis`).
+
+Vincoli applicativi nel Repository prima di insert/update: `vehicleId > 0`, `timestampEpochMillis > 0`, `odometerKm >= 0`, `litersMilliliters > 0`, `totalCostCents > 0`, `fuelType` non vuoto; ordinando i record dello stesso veicolo per data, l'odometro non può diminuire. Odometraggi uguali restano ammessi. In M3 non vengono memorizzati `pricePerLiter`, note o impianto: il prezzo/litro è derivato da costo/litri; note e collegamento impianto restano estensioni future.
+
+`isFullTank` viene anticipato rispetto alla bozza M0 perché è necessario per calcoli corretti anche in presenza di rifornimenti parziali. Un rifornimento parziale non chiude una finestra di consumo; i suoi litri/costi confluiscono nella successiva finestra pieno→pieno.
 
 ### Impianto
 ID MIMIT, gestore, bandiera, tipo, nome, indirizzo, comune, provincia, latitudine, longitudine e metadati import. Eni è solo un filtro iniziale.
@@ -78,9 +96,9 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] Storico prezzi: 2 varianti statiche.
 
 ### Registro e calcoli
-- [ ] CRUD rifornimenti + Room.
-- [ ] Consumo medio, costo/km, autonomia residua.
-- [ ] JUnit e casi limite.
+- [~] CRUD rifornimenti + Room.
+- [~] Consumo medio, costo/km, autonomia residua.
+- [~] JUnit e casi limite.
 
 ### Dati MIMIT
 - [ ] Download/parsing/import.
@@ -154,8 +172,64 @@ Deliverable:
 - [x] verifica reale di due workflow indipendenti riusciti con APK installabili e identico SHA-256 del certificato persistente.
 
 ### M3 — Registro rifornimenti + calcoli
-Stato: **[ ] da fare**
-Deliverable: Room, CRUD, singolo veicolo, consumo/costo/autonomia e JUnit.
+Stato: **[~] in corso**
+
+Decisioni tecniche fissate prima del codice:
+- Room `2.8.4` (`androidx.room`) con KSP `2.3.11`; si resta sulla linea Room 2.x stabile per questa milestone Android-only invece di introdurre contemporaneamente la migrazione a Room 3;
+- Lifecycle `2.11.0` per ViewModel/Compose;
+- database `W2FullDatabase`, versione schema `1`;
+- `versionCode 2`, `versionName 0.2.0-m3`;
+- singleton veicolo V1 con `vehicleId = 1`;
+- denaro e carburante persistiti come interi (`cent`, `millilitri`), conversione in `Double` solo nel dominio/UI;
+- CRUD DAO asincrono con `suspend` e lista osservabile con `Flow`;
+- Repository responsabile della validazione dei record e dell'inizializzazione del veicolo singleton;
+- test JVM dei calcoli puri e test CRUD Room su database in-memory tramite Robolectric, senza introdurre test device/emulatore in M3.
+
+Formule M3. I record sono ordinati in modo deterministico per `odometerKm`, poi `timestampEpochMillis`, poi `id`.
+
+**Prezzo unitario derivato** per un rifornimento:
+`pricePerLiterEuro = (totalCostCents / 100.0) / (litersMilliliters / 1000.0)`.
+
+**Finestra valida consumo/costo**: servono almeno due rifornimenti con `isFullTank = true`. Sia `F0` il primo pieno e `Fn` l'ultimo pieno della finestra. Tutti i rifornimenti dopo `F0` e fino a `Fn` compreso — inclusi eventuali parziali — rappresentano il carburante reintegrato/consumato nella distanza chiusa. Il pieno iniziale `F0` è escluso dalla somma dei litri/costi perché rappresenta l'inventario di partenza.
+
+`distanceKm = Fn.odometerKm - F0.odometerKm`
+
+`consumedLiters = sum(litersMilliliters dei record (F0, Fn]) / 1000.0`
+
+`averageConsumptionLPer100Km = consumedLiters / distanceKm * 100.0`
+
+`consumedCostEuro = sum(totalCostCents dei record (F0, Fn]) / 100.0`
+
+`costPerKmEuro = consumedCostEuro / distanceKm`
+
+Se ci sono meno di due pieni, `distanceKm <= 0` o litri validi assenti, consumo medio e costo/km sono `null`/non disponibili anziché inventare valori.
+
+**Autonomia residua stimata**: è riferita all'ultimo odometro noto nel registro, non a chilometri percorsi dopo l'ultimo record. Richiede: capacità serbatoio configurata `tankCapacityLiters > 0`, consumo medio valido e almeno un pieno che faccia da ancora. Sia `F` l'ultimo record con `isFullTank = true`; siano `P` i soli rifornimenti parziali successivi a `F`; sia `K` l'odometro massimo dei record da `F` in poi.
+
+`distanceSinceFullKm = K - F.odometerKm`
+
+`estimatedConsumedSinceFullLiters = distanceSinceFullKm * averageConsumptionLPer100Km / 100.0`
+
+`partialAddedLiters = sum(P.litersMilliliters) / 1000.0`
+
+`estimatedRemainingLiters = clamp(tankCapacityLiters - estimatedConsumedSinceFullLiters + partialAddedLiters, 0.0, tankCapacityLiters)`
+
+`estimatedRangeKm = estimatedRemainingLiters / averageConsumptionLPer100Km * 100.0`
+
+Se capacità, consumo medio o pieno-ancora mancano, autonomia e litri residui sono `null`. Il `clamp` impedisce stime fisicamente superiori alla capacità o negative.
+
+Sotto-passaggi M3:
+1. **M3.1 — nucleo dati/calcoli**: entità Room, DAO, database, Repository, motore formule e test JVM/Room; nessuna UI CRUD nuova finché questo blocco non è verde in CI.
+2. **M3.2 — registro Compose**: una sola schermata Registro con riepilogo metriche + lista; inserimento/modifica tramite dialog, eliminazione con conferma e configurazione capacità serbatoio tramite dialog. Non si introduce Navigation né una seconda schermata in M3.
+3. **M3.3 — verifica/chiusura**: build reale su `main`, APK firmato con keystore persistente, aggiornamento finale della spec e cleanup branch temporaneo.
+
+Deliverable:
+- [~] Room schema v1 con `VehicleEntity` e `RifornimentoEntity` secondo lo schema sopra;
+- [~] DAO/Repository CRUD e validazioni;
+- [~] consumo medio, costo/km e autonomia residua con rifornimenti parziali gestiti pieno→pieno;
+- [~] test JVM dei casi normali e limite + CRUD Room in-memory;
+- [ ] schermata Compose Registro con add/edit/delete e capacità serbatoio;
+- [ ] CI reale e APK M3 aggiornabile con la chiave persistente già verificata in M2.
 
 ### M4 — Integrazione dati MIMIT
 Stato: **[ ] da fare**
@@ -178,7 +252,7 @@ M1 produce riferimenti **statici**, non componenti Compose funzionanti.
 ### Tema default — Petrol Night
 Background `#101418`; Surface `#182028`; Primary `#33C3A5`; Secondary `#7FD1FF`; Accent `#FFB84D`; Alert `#FF6B6B`; testo `#F5F7FA` / `#A9B4C2`.
 
-Direzione: scura, tecnica, automotive e data-centric. **Petrol Night è la variante predefinita approvata per i mockup e fungerà da riferimento iniziale per la UI Compose in M2.**
+Direzione: scura, tecnica, automotive e data-centric. **Petrol Night è la variante predefinita approvata per i mockup e fungerà da riferimento iniziale per la UI Compose.**
 
 ### Variante alternativa — Road Light
 Background `#F6F7F9`; Surface `#FFFFFF`; Primary `#1C6DD0`; Secondary `#25A18E`; Accent `#F59E0B`; Alert `#E45757`; testo `#1F2937` / `#6B7280`.
@@ -230,13 +304,21 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 
 Da M2: GitHub Actions con checkout, JDK 17, Gradle 9.5.0 installato e pinning tramite `gradle/actions/setup-gradle@v4`, test JVM, build `assembleDebug`, verifica dell'APK e upload artifact. Non viene committato un Gradle Wrapper binario in M2: il runner usa la distribuzione Gradle fissata dalla pipeline, evitando un JAR wrapper generato o trasferito fuori dal normale flusso sorgente.
 
-Toolchain M2: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
+Toolchain M2/M3: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
 
 La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato nei log o committato.
 
 La firma persistente è stata verificata il **1 settembre 2026** su due runner GitHub Actions distinti. I run `33501937187` e `33502077657` hanno entrambi eseguito con successo il ripristino del keystore, `testDebugUnitTest`, `assembleDebug`, `apksigner verify` e upload dell'artifact `w2full-debug-apk`. Entrambi gli APK riportano certificato `CN=W2Full Debug, OU=Personal, O=Archimede Projects, C=IT` con SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, confermando che gli APK futuri firmati con questi secret sono aggiornabili senza cambio chiave.
 
 ## 10. Changelog
+
+### 2026-09-01 — M3 avviata: schema Room e formule fissati
+- M3 marcata in corso prima di modificare codice/configurazione Android.
+- Fissato lo schema Room v1 di `vehicles` e `refuel_entries`, con unità persistenti intere per millilitri e centesimi.
+- Promosso `isFullTank` a campo M3 per supportare correttamente rifornimenti parziali e finestre pieno→pieno.
+- Fissate le formule per consumo medio, costo/km, carburante residuo stimato e autonomia all'ultimo odometro noto.
+- Scelti Room 2.8.4, KSP 2.3.11 e Lifecycle 2.11.0; previsto CRUD Room verificato anche con test JVM in-memory.
+- M3 suddivisa in nucleo dati/calcoli, UI Registro singola schermata e verifica/chiusura.
 
 ### 2026-09-01 — M2 completata
 - Completato lo scheletro Android nativo Kotlin + Jetpack Compose + Material 3 con `applicationId` `com.archimede.w2full` e tema Petrol Night.
@@ -304,8 +386,6 @@ La firma persistente è stata verificata il **1 settembre 2026** su due runner G
 ## 11. Decisioni aperte
 
 - versionamento/naming GitHub Releases e trigger Release;
-- semantica autonomia e unità consumo;
-- rifornimenti parziali;
 - raggio e ordinamento stazioni;
 - permessi posizione minimali;
 - retention storico prezzi;
