@@ -14,7 +14,12 @@ Obiettivi: registro rifornimenti; consumo medio, costo/km e autonomia residua; i
 - Nessun account, backend o cloud per i dati utente.
 - Distribuzione solo APK / GitHub Releases, non Play Store.
 - Kotlin + Jetpack Compose + Material 3, dark mode.
+- `applicationId` e namespace: `com.archimede.w2full`.
 - Target principale Samsung Galaxy S25.
+- SDK M2: `minSdk 26`, `targetSdk 37`, `compileSdk 37`.
+- `minSdk 26` mantiene compatibilità da Android 8.0 senza introdurre supporto legacy non necessario per le API previste; il Galaxy S25 resta ampiamente coperto.
+- `targetSdk 37` adotta i comportamenti correnti di Android 17; `compileSdk 37` è richiesto dalle release Compose 1.12.x correnti.
+- Toolchain M2: Android Gradle Plugin 9.3.0, Gradle 9.5.0, JDK 17, Kotlin/Compose compiler 2.3.21, Compose BOM 2026.08.00.
 - Un solo veicolo in V1, modello estendibile.
 - Filtro iniziale Eni, modello impianto generico.
 - Rete solo per CSV MIMIT via OkHttp.
@@ -57,9 +62,9 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 
 ### Fondazioni
 - [x] Repo pubblica e documentazione M0.
-- [ ] Scheletro Android Compose.
-- [ ] CI con test/build e APK reale.
-- [ ] Firma debug persistente da secrets.
+- [~] Scheletro Android Compose.
+- [~] CI con test/build e APK reale.
+- [~] Firma debug persistente da secrets.
 - [ ] GitHub Releases per APK debug.
 
 ### Design
@@ -114,8 +119,35 @@ Il lockup finale è anch'esso un asset raster derivato dall'immagine originale a
 In **M2**, durante lo scaffold Android, questa sorgente dovrà essere trasformata in una **Adaptive Icon** Android con foreground/background separati e safe-zone verificata, mantenendo la resa approvata.
 
 ### M2 — Scheletro Android + CI con APK installabile
-Stato: **[ ] da fare**
-Deliverable: Kotlin, Compose/Material 3, package/applicationId definito prima del codice, target S25, test minimo, CI reale, APK debug e firma stabile. Include la derivazione dell'Adaptive Icon Android dalla sorgente approvata in M1.
+Stato: **[~] in corso**
+
+Decisioni tecniche fissate prima del codice:
+- `namespace` / `applicationId`: `com.archimede.w2full`;
+- `minSdk 26` (Android 8.0), compromesso tra compatibilità e assenza di workaround legacy non necessari;
+- `targetSdk 37` e `compileSdk 37` per Android 17 e compatibilità con Compose 1.12;
+- Android Gradle Plugin `9.3.0`, Gradle `9.5.0`, JDK `17`;
+- Kotlin/Compose compiler `2.3.21` con Kotlin integrato di AGP 9;
+- Compose BOM `2026.08.00`, Material 3;
+- `versionCode 1`, `versionName 0.1.0-m2` per il primo APK installabile;
+- adaptive icon derivata da `design/final/icon-source.png`, preservando la sorgente M1 e usando un foreground con safe-zone e background Petrol Night;
+- test JVM minimo obbligatorio in CI prima di `assembleDebug`;
+- APK CI caricato come artifact GitHub Actions e verificato come file `.apk` non vuoto;
+- firma debug persistente ricostruita solo nel runner da GitHub Actions Secrets, senza file di chiave nel repository.
+
+Secrets M2:
+- `W2FULL_DEBUG_KEYSTORE_BASE64` — keystore binario codificato Base64;
+- `W2FULL_DEBUG_KEYSTORE_PASSWORD` — password del keystore;
+- `W2FULL_DEBUG_KEY_ALIAS` — alias della chiave;
+- `W2FULL_DEBUG_KEY_PASSWORD` — password della chiave.
+
+Deliverable:
+- [~] scheletro Kotlin + Compose/Material 3 con tema Petrol Night;
+- [~] package/applicationId `com.archimede.w2full`;
+- [~] Adaptive Icon Android derivata dalla sorgente approvata;
+- [~] test JVM minimo;
+- [~] workflow GitHub Actions con JDK 17, test, `assembleDebug`, verifica e upload APK;
+- [~] firma debug persistente tramite i quattro secret definiti sopra;
+- [ ] verifica reale di almeno un workflow riuscito con APK installabile firmato con il keystore persistente.
 
 ### M3 — Registro rifornimenti + calcoli
 Stato: **[ ] da fare**
@@ -192,9 +224,23 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 
 ## 9. CI/CD
 
-Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equivalente, verifica APK e upload artifact. Keystore debug generato una volta, codificato in secret, ricostruito nel runner e mai stampato nei log.
+Da M2: GitHub Actions con checkout, JDK 17, Gradle wrapper, test JVM, build `assembleDebug`, verifica dell'APK e upload artifact.
+
+Toolchain M2: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
+
+La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato nei log o committato.
+
+Finché i quattro secret non sono configurati, la CI può validare codice/test e produrre un APK debug con la chiave debug effimera standard del runner, ma **M2 non può essere chiusa**: la chiusura richiede un run verificato che utilizzi il keystore persistente.
 
 ## 10. Changelog
+
+### 2026-09-01 — M2 avviata: toolchain e firma definite
+- Confermato `applicationId`/namespace `com.archimede.w2full`.
+- Fissati `minSdk 26`, `targetSdk 37`, `compileSdk 37`.
+- Scelti AGP 9.3.0, Gradle 9.5.0, JDK 17, Kotlin/Compose compiler 2.3.21 e Compose BOM 2026.08.00.
+- Motivato `minSdk 26` come floor compatibile senza oneri legacy superflui; API 37 segue Android 17 e il requisito delle release Compose 1.12 correnti.
+- Definiti i quattro GitHub Actions Secrets per il keystore debug persistente.
+- M2 marcata in corso prima di introdurre codice Android.
 
 ### 2026-09-01 — M1 Design completata
 - Spostati i master raster approvati nei percorsi finali `design/final/icon-source.png` e `design/final/logo-lockup.png`, preservando i blob originali.
@@ -238,9 +284,7 @@ Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equ
 
 ## 11. Decisioni aperte
 
-- package/applicationId e SDK definitivi in M2;
-- versionamento/naming APK e trigger Release;
-- secrets keystore;
+- versionamento/naming GitHub Releases e trigger Release;
 - semantica autonomia e unità consumo;
 - rifornimenti parziali;
 - raggio e ordinamento stazioni;
