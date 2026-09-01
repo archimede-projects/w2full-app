@@ -128,7 +128,9 @@ Decisioni tecniche fissate prima del codice:
 - Android Gradle Plugin `9.3.0`, Gradle `9.5.0`, JDK `17`;
 - Kotlin/Compose compiler `2.3.21` con Kotlin integrato di AGP 9;
 - Compose BOM `2026.08.00`, Material 3;
+- AndroidX Activity Compose `1.13.0`;
 - `versionCode 1`, `versionName 0.1.0-m2` per il primo APK installabile;
+- Gradle 9.5.0 viene installato in CI tramite `gradle/actions/setup-gradle@v4` con versione esplicitamente fissata; M2 non dipende da un wrapper binario committato;
 - adaptive icon derivata da `design/final/icon-source.png`, preservando la sorgente M1 e usando un foreground con safe-zone e background Petrol Night;
 - test JVM minimo obbligatorio in CI prima di `assembleDebug`;
 - APK CI caricato come artifact GitHub Actions e verificato come file `.apk` non vuoto;
@@ -145,7 +147,7 @@ Deliverable:
 - [~] package/applicationId `com.archimede.w2full`;
 - [~] Adaptive Icon Android derivata dalla sorgente approvata;
 - [~] test JVM minimo;
-- [~] workflow GitHub Actions con JDK 17, test, `assembleDebug`, verifica e upload APK;
+- [~] workflow GitHub Actions con JDK 17, Gradle 9.5.0 pinning, test, `assembleDebug`, verifica e upload APK;
 - [~] firma debug persistente tramite i quattro secret definiti sopra;
 - [ ] verifica reale di almeno un workflow riuscito con APK installabile firmato con il keystore persistente.
 
@@ -224,7 +226,7 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 
 ## 9. CI/CD
 
-Da M2: GitHub Actions con checkout, JDK 17, Gradle wrapper, test JVM, build `assembleDebug`, verifica dell'APK e upload artifact.
+Da M2: GitHub Actions con checkout, JDK 17, Gradle 9.5.0 installato e pinning tramite `gradle/actions/setup-gradle@v4`, test JVM, build `assembleDebug`, verifica dell'APK e upload artifact. Non viene committato un Gradle Wrapper binario in M2: il runner usa la distribuzione Gradle fissata dalla pipeline, evitando un JAR wrapper generato o trasferito fuori dal normale flusso sorgente.
 
 Toolchain M2: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
 
@@ -238,8 +240,10 @@ Finché i quattro secret non sono configurati, la CI può validare codice/test e
 - Confermato `applicationId`/namespace `com.archimede.w2full`.
 - Fissati `minSdk 26`, `targetSdk 37`, `compileSdk 37`.
 - Scelti AGP 9.3.0, Gradle 9.5.0, JDK 17, Kotlin/Compose compiler 2.3.21 e Compose BOM 2026.08.00.
+- Fissata AndroidX Activity Compose 1.13.0 stabile.
 - Motivato `minSdk 26` come floor compatibile senza oneri legacy superflui; API 37 segue Android 17 e il requisito delle release Compose 1.12 correnti.
 - Definiti i quattro GitHub Actions Secrets per il keystore debug persistente.
+- Chiarito che M2 usa Gradle 9.5.0 pinning tramite `setup-gradle`, senza committare un wrapper JAR binario.
 - M2 marcata in corso prima di introdurre codice Android.
 
 ### 2026-09-01 — M1 Design completata
