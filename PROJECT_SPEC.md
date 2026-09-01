@@ -66,7 +66,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] Direzione visiva approvata: **Petrol Night** come tema default dei mockup.
 - [x] Concept icona approvato: gauge con lancetta arancione e identità W2Full.
 - [~] Sorgente icona finale raster PNG 1024×1024 in `design/final/icon-source.png`, senza wordmark esterno.
-- [~] Lockup separato con wordmark in `design/final/logo-lockup.png`.
+- [~] Lockup raster approvato in `design/final/logo-lockup.png`, derivato dall'immagine originale approvata e non ridisegnato con font di sistema.
 - [~] Spostamento dei 3 concept logo scartati in `design/archive/`.
 - [x] Home: 2 varianti statiche.
 - [x] Registro rifornimenti: 2 varianti statiche.
@@ -93,13 +93,13 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 Stato: **[x] fatto**
 
 ### M1 — Design: logo e mockup
-Stato: **[~] in corso — aggiustamento finale asset approvato**
+Stato: **[~] in corso — asset finali approvati, sistemazione repository in corso**
 
 Deliverable:
 - [x] concept logo/icona W2Full esplorati;
 - [x] scelta finale del concept gauge;
 - [~] `design/final/icon-source.png` — PNG raster 1024×1024, solo icona;
-- [~] `design/final/logo-lockup.png` — lockup con wordmark per README/store;
+- [~] `design/final/logo-lockup.png` — lockup raster approvato, derivato direttamente dall'immagine originale approvata;
 - [~] 3 concept scartati archiviati in `design/archive/`;
 - [x] 2 mockup statici Home in `design/mockup/`;
 - [x] 2 mockup statici Registro rifornimenti in `design/mockup/`;
@@ -108,6 +108,8 @@ Deliverable:
 - [x] nessun codice app introdotto.
 
 L'icona finale è intenzionalmente un asset **raster PNG**, non il corrispondente SVG semplificato: gradienti, riflessi, ombre e profondità 3D del concept approvato non sono replicabili fedelmente con l'SVG scritto a mano usato per le bozze iniziali.
+
+Il lockup finale è anch'esso un asset raster derivato dall'immagine originale approvata con wordmark `W2Full`; non deve essere sostituito da testo ridisegnato con font di sistema.
 
 In **M2**, durante lo scaffold Android, questa sorgente dovrà essere trasformata in una **Adaptive Icon** Android con foreground/background separati e safe-zone verificata, mantenendo la resa approvata.
 
@@ -154,7 +156,7 @@ Direzione: chiara, leggibile, editoriale. Resta come variante/secondo riferiment
 
 ### Icona e lockup finali
 - `design/final/icon-source.png` — sorgente ufficiale icona, **PNG raster 1024×1024**, senza wordmark esterno.
-- `design/final/logo-lockup.png` — lockup separato gauge + wordmark W2Full, destinato a README/materiale di presentazione/store.
+- `design/final/logo-lockup.png` — lockup raster derivato direttamente dall'immagine originale approvata con wordmark W2Full, destinato a README/materiale di presentazione/store.
 
 La sorgente ufficiale è raster perché il livello di dettaglio approvato (gradienti, ombre, riflessi, effetti metallici/3D) è sostanzialmente superiore agli SVG flat scritti a mano; usare lo SVG semplificato come master visivo produrrebbe una resa diversa da quella approvata.
 
@@ -193,6 +195,12 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equivalente, verifica APK e upload artifact. Keystore debug generato una volta, codificato in secret, ricostruito nel runner e mai stampato nei log.
 
 ## 10. Changelog
+
+### 2026-09-01 — M1 Design: sistemazione finale asset in corso
+- Confermato `icon-source.png` come master raster PNG dell'icona approvata.
+- Confermato `logo-lockup.png` come ritaglio raster dell'immagine originale approvata, senza ridisegno del wordmark.
+- Previsto spostamento dei tre concept scartati in `design/archive/`.
+- Previsto cleanup completo del materiale temporaneo di assemblaggio prima della chiusura M1.
 
 ### 2026-09-01 — M1 Design: aggiustamento finale avviato
 - Approvato il concept gauge con lancetta arancione come icona finale.
