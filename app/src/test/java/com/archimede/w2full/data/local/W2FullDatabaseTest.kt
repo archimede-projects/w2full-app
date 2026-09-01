@@ -37,51 +37,55 @@ class W2FullDatabaseTest {
     }
 
     @Test
-    fun `repository performs create update read delete against Room`() = runBlocking {
-        val id = repository.insert(
-            RifornimentoDraft(
-                timestampEpochMillis = 1_000,
-                odometerKm = 10_000,
-                litersMilliliters = 40_000,
-                totalCostCents = 7_000,
-                fuelType = " Benzina ",
-                isFullTank = true,
-            ),
-        )
+    fun `repository performs create update read delete against Room`() {
+        runBlocking {
+            val id = repository.insert(
+                RifornimentoDraft(
+                    timestampEpochMillis = 1_000,
+                    odometerKm = 10_000,
+                    litersMilliliters = 40_000,
+                    totalCostCents = 7_000,
+                    fuelType = " Benzina ",
+                    isFullTank = true,
+                ),
+            )
 
-        val created = repository.observeRefuelings().first().single()
-        assertEquals(id, created.id)
-        assertEquals("Benzina", created.fuelType)
+            val created = repository.observeRefuelings().first().single()
+            assertEquals(id, created.id)
+            assertEquals("Benzina", created.fuelType)
 
-        repository.update(created.copy(totalCostCents = 7_500))
-        val updated = repository.observeRefuelings().first().single()
-        assertEquals(7_500, updated.totalCostCents)
+            repository.update(created.copy(totalCostCents = 7_500))
+            val updated = repository.observeRefuelings().first().single()
+            assertEquals(7_500, updated.totalCostCents)
 
-        repository.delete(id)
-        assertTrue(repository.observeRefuelings().first().isEmpty())
+            repository.delete(id)
+            assertTrue(repository.observeRefuelings().first().isEmpty())
+        }
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `repository rejects odometer regression over time`() = runBlocking {
-        repository.insert(
-            RifornimentoDraft(
-                timestampEpochMillis = 1_000,
-                odometerKm = 10_000,
-                litersMilliliters = 40_000,
-                totalCostCents = 7_000,
-                fuelType = "Benzina",
-                isFullTank = true,
-            ),
-        )
-        repository.insert(
-            RifornimentoDraft(
-                timestampEpochMillis = 2_000,
-                odometerKm = 9_999,
-                litersMilliliters = 10_000,
-                totalCostCents = 2_000,
-                fuelType = "Benzina",
-                isFullTank = false,
-            ),
-        )
+    fun `repository rejects odometer regression over time`() {
+        runBlocking {
+            repository.insert(
+                RifornimentoDraft(
+                    timestampEpochMillis = 1_000,
+                    odometerKm = 10_000,
+                    litersMilliliters = 40_000,
+                    totalCostCents = 7_000,
+                    fuelType = "Benzina",
+                    isFullTank = true,
+                ),
+            )
+            repository.insert(
+                RifornimentoDraft(
+                    timestampEpochMillis = 2_000,
+                    odometerKm = 9_999,
+                    litersMilliliters = 10_000,
+                    totalCostCents = 2_000,
+                    fuelType = "Benzina",
+                    isFullTank = false,
+                ),
+            )
+        }
     }
 }

@@ -106,10 +106,10 @@ class RefuelingRepository(
             .forEach { (_, sameTimestampEntries) ->
                 val currentMinOdometer = sameTimestampEntries.minOf { it.odometerKm }
                 val currentMaxOdometer = sameTimestampEntries.maxOf { it.odometerKm }
-                require(
-                    previousTimestampMaxOdometer == null ||
-                        currentMinOdometer >= previousTimestampMaxOdometer!!,
-                ) { "L'odometro non può diminuire nel tempo." }
+                val previousMax = previousTimestampMaxOdometer
+                require(previousMax == null || currentMinOdometer >= previousMax) {
+                    "L'odometro non può diminuire nel tempo."
+                }
                 previousTimestampMaxOdometer = currentMaxOdometer
             }
     }
