@@ -101,8 +101,11 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] JUnit e casi limite.
 
 ### Dati MIMIT
-- [ ] Download/parsing/import.
-- [ ] Filtro Eni, posizione, Haversine, stazioni vicine.
+- [~] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
+- [ ] Import locale impianti/prezzi.
+- [ ] Filtro bandiera Eni.
+- [ ] Posizione utente + Haversine.
+- [ ] UI stazioni vicine.
 - [ ] Refresh manuale + WorkManager giornaliero.
 
 ### Storico/notifiche/rifiniture
@@ -234,8 +237,42 @@ Deliverable:
 Verifica finale M3 su `main`: il run GitHub Actions `33527223004`, head SHA `14df6c15d25cec8d7f5fcdfb0b24e2daac4dda50`, ha completato con successo ripristino del keystore persistente, `testDebugUnitTest`, `assembleDebug`, verifica `apksigner` e upload dell'artifact `w2full-debug-apk` ID `9808283878` (12.507.371 byte, digest ZIP `sha256:ed7a8bbfdbf60572a92988b8222721a965a916a6acaed6082417d911b622b550`). Il certificato APK SHA-256 è `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico a M2 e ai build verificati sul branch M3.
 
 ### M4 — Integrazione dati MIMIT
-Stato: **[ ] da fare**
-Deliverable: OkHttp, parsing formato corrente, import impianti/prezzi, Eni, WorkManager, posizione/Haversine, stazioni vicine.
+Stato: **[~] in corso**
+
+Verifica esterna obbligatoria rifatta il **1 settembre 2026**, prima di qualunque codice M4:
+- la pagina ufficiale MIMIT continua a esporre i download `https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv` e `https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv`; i link raggiungono risorse `text/csv`;
+- il metadato ufficiale attualmente collegato è `Metadati_prezzi_carburanti_20260128.pdf`, indicato dalla pagina come versione in vigore dal 10 febbraio 2026;
+- il delimitatore ufficiale resta `|` e i numeri usano il punto come separatore decimale;
+- colonne prezzi secondo il metadato corrente: `idimpianto`, `descCarburante`, `prezzo`, `isSelf`, `dtComu`;
+- colonne anagrafica secondo il metadato corrente: `idimpianto`, `Gestore`, `Bandiera`, `Tipo Impianto`, `Nome Impianto`, `Indirizzo`, `Comune`, `Provincia`, `Latitudine`, `Longitudine`; l'asterisco mostrato nel PDF accanto a Latitudine/Longitudine è un richiamo alla nota sulle coordinate volontarie, non viene trattato come parte del nome logico della colonna;
+- non sono emerse differenze sostanziali rispetto agli URL/formato già annotati: la differenza documentale rilevante è che il metadato corrente scrive `idimpianto` tutto minuscolo, mentre dataset/esempi storici mostrano anche `idImpianto`; il parser M4 deve quindi validare i nomi colonna senza distinzione di maiuscole/minuscole, mantenendo invece rigorosi numero e significato delle colonne.
+
+Decisioni tecniche M4.1 — download/parsing, da implementare prima di Eni/posizione/UI:
+- OkHttp `5.5.0` per il download HTTPS; nessun download MIMIT reale viene eseguito nei test CI;
+- `versionCode 3`, `versionName 0.3.0-m4`;
+- endpoint centralizzati in una classe/oggetto MIMIT dedicato, senza URL sparsi nella UI;
+- parser pipe-delimited separato dal client HTTP e testabile da `Reader`/testo statico;
+- supporto al preambolo di estrazione (`Estrazione del ...`) e individuazione/validazione dell'header atteso;
+- campioni statici ridotti, sintetici e aderenti al contratto corrente sotto `app/src/test/resources/mimit/`; i campioni non devono essere copie massive del dataset reale;
+- parser con supporto a campi racchiusi tra doppi apici e escaping `""`, così separatori o virgolette nei valori non rompono la riga;
+- `idimpianto` → `Long`; `prezzo` → millesimi di euro per unità (`Long`) per preservare le 3 cifre decimali; `isSelf` → `Boolean`; `dtComu` → `LocalDateTime` nel formato `dd/MM/yyyy HH:mm:ss`;
+- coordinate anagrafica nullable: i metadati dichiarano che sono volontarie e non sempre verificate; valori vuoti restano `null` senza scartare l'impianto;
+- i test del download usano MockWebServer `5.5.0` alimentato dalle fixture statiche locali, così verificano HTTP + parsing senza dipendere da MIMIT o Internet.
+
+Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
+1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. Fermarsi dopo il verde e attendere conferma utente.
+2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati.
+3. **M4.3 — posizione e distanza**: permessi minimali, posizione utente e Haversine, con test della formula indipendenti dalla posizione reale.
+4. **M4.4 — UI stazioni vicine**: stato ViewModel/Repository e schermata Compose; nessun ampliamento a storico/notifiche.
+5. **M4.5 — import/sync**: persistenza dei dati necessari, refresh manuale e WorkManager giornaliero, solo dopo conferma dei passaggi precedenti.
+
+Deliverable M4.1:
+- [ ] client HTTPS per i due endpoint MIMIT;
+- [ ] parser anagrafica e prezzi secondo il contratto sopra;
+- [ ] DTO indipendenti da Room/UI;
+- [ ] fixture statiche sotto `app/src/test/resources/mimit/`;
+- [ ] test JVM parser + MockWebServer senza Internet;
+- [ ] CI branch reale con test, APK e firma persistente verdi.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -296,17 +333,19 @@ Dataset MIMIT: **Carburanti - Prezzi praticati e anagrafica degli impianti**.
 
 Pagina: `https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti`
 
-URL verificati al 31 agosto 2026:
+URL ricontrollati dal vivo il **1 settembre 2026** sulla pagina ufficiale:
 - `https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv`
 - `https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv`
 
-Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi alle 8” è `|`. In M4 vanno ricontrollati URL, header e formato effettivo prima del parser. Licenza dati: IODL 2.0 secondo la pagina ufficiale.
+I link correnti raggiungono risorse `text/csv`. Il metadato ufficiale collegato dalla stessa pagina è `https://www.mimit.gov.it/images/stories/documenti/Metadati_prezzi_carburanti_20260128.pdf`, versione indicata come in vigore dal 10 febbraio 2026.
+
+Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi alle 8” è `|`. Il metadato corrente conferma numeri in formato internazionale con `.` decimale. Header logici attesi: prezzi `idimpianto|descCarburante|prezzo|isSelf|dtComu`; anagrafica `idimpianto|Gestore|Bandiera|Tipo Impianto|Nome Impianto|Indirizzo|Comune|Provincia|Latitudine|Longitudine`. La validazione dell'header M4 è case-insensitive per assorbire la variante storica `idImpianto` senza accettare colonne mancanti o semanticamente diverse. Licenza dati: IODL 2.0 secondo la pagina ufficiale.
 
 ## 9. CI/CD
 
 Da M2: GitHub Actions con checkout, JDK 17, Gradle 9.5.0 installato e pinning tramite `gradle/actions/setup-gradle@v4`, test JVM, build `assembleDebug`, verifica dell'APK e upload artifact. Non viene committato un Gradle Wrapper binario in M2: il runner usa la distribuzione Gradle fissata dalla pipeline, evitando un JAR wrapper generato o trasferito fuori dal normale flusso sorgente.
 
-Toolchain M2/M3: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
+Toolchain M2/M3/M4: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
 
 La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato nei log o committato.
 
@@ -314,7 +353,17 @@ La firma persistente è stata verificata il **1 settembre 2026** su due runner G
 
 M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `33527223004`: test JVM/Room/parser, build debug, `apksigner` e artifact sono tutti riusciti con lo stesso certificato persistente SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
 
+Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
+
 ## 10. Changelog
+
+### 2026-09-01 — M4 avviata: contratto CSV MIMIT riverificato
+- Prima del codice M4 sono stati ricontrollati dal vivo pagina dataset, link CSV e metadato MIMIT corrente: gli URL restano invariati e puntano a risorse `text/csv`.
+- Confermati separatore `|`, formato numerico internazionale e colonne documentate dal metadato in vigore dal 10 febbraio 2026.
+- Esplicitata la normalizzazione case-insensitive dell'header per la sola variante `idimpianto`/`idImpianto`, senza rilassare il controllo sulle colonne richieste.
+- M4 suddivisa in M4.1 download/parsing, M4.2 filtro Eni, M4.3 posizione/Haversine, M4.4 UI stazioni vicine e M4.5 import/sync.
+- Per M4.1 scelti OkHttp/MockWebServer 5.5.0 e fixture statiche locali; i test CI non contatteranno MIMIT.
+- M4 marcata in corso; autorizzato esclusivamente M4.1 fino a nuova conferma utente.
 
 ### 2026-09-01 — M3 completata
 - Integrato su `main` con fast-forward puro il codice M3 già verificato sul branch `m3-refueling-register`; commit applicativo finale prima della chiusura spec: `14df6c15d25cec8d7f5fcdfb0b24e2daac4dda50`.
