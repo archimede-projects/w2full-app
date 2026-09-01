@@ -65,9 +65,9 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 ### Design
 - [x] Direzione visiva approvata: **Petrol Night** come tema default dei mockup.
 - [x] Concept icona approvato: gauge con lancetta arancione e identità W2Full.
-- [~] Sorgente icona finale raster PNG 1024×1024 in `design/final/icon-source.png`, senza wordmark esterno.
-- [~] Lockup raster approvato in `design/final/logo-lockup.png`, derivato dall'immagine originale approvata e non ridisegnato con font di sistema.
-- [~] Spostamento dei 3 concept logo scartati in `design/archive/`.
+- [x] Sorgente icona finale raster PNG 1024×1024 in `design/final/icon-source.png`, senza wordmark esterno.
+- [x] Lockup raster approvato in `design/final/logo-lockup.png`, derivato dall'immagine originale approvata e non ridisegnato con font di sistema.
+- [x] Spostamento dei 3 concept logo scartati in `design/archive/`.
 - [x] Home: 2 varianti statiche.
 - [x] Registro rifornimenti: 2 varianti statiche.
 - [x] Storico prezzi: 2 varianti statiche.
@@ -93,14 +93,14 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 Stato: **[x] fatto**
 
 ### M1 — Design: logo e mockup
-Stato: **[~] in corso — asset finali approvati, sistemazione repository in corso**
+Stato: **[x] fatto**
 
 Deliverable:
 - [x] concept logo/icona W2Full esplorati;
 - [x] scelta finale del concept gauge;
-- [~] `design/final/icon-source.png` — PNG raster 1024×1024, solo icona;
-- [~] `design/final/logo-lockup.png` — lockup raster approvato, derivato direttamente dall'immagine originale approvata;
-- [~] 3 concept scartati archiviati in `design/archive/`;
+- [x] `design/final/icon-source.png` — PNG raster 1024×1024, solo icona;
+- [x] `design/final/logo-lockup.png` — lockup raster approvato, derivato direttamente dall'immagine originale approvata;
+- [x] 3 concept scartati archiviati in `design/archive/`;
 - [x] 2 mockup statici Home in `design/mockup/`;
 - [x] 2 mockup statici Registro rifornimenti in `design/mockup/`;
 - [x] 2 mockup statici Storico prezzi in `design/mockup/`;
@@ -195,6 +195,14 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equivalente, verifica APK e upload artifact. Keystore debug generato una volta, codificato in secret, ricostruito nel runner e mai stampato nei log.
 
 ## 10. Changelog
+
+### 2026-09-01 — M1 Design completata
+- Spostati i master raster approvati nei percorsi finali `design/final/icon-source.png` e `design/final/logo-lockup.png`, preservando i blob originali.
+- Mantenuto `design/logo/w2full-logo-concept-01.svg` come bozza vettoriale del concept gauge selezionato.
+- Archiviati i concept scartati 02, 03 e 04 in `design/archive/`.
+- Verificati i 6 mockup statici in `design/mockup/`, con Petrol Night come riferimento default.
+- Verificato che `main` non contiene `.m1-tmp/` né `.github/workflows/m1-assemble-assets.yml`; il materiale di assemblaggio temporaneo è rimasto confinato al branch temporaneo destinato al cleanup post-chiusura.
+- M1 chiusa senza introdurre codice Android; M2 resta da avviare solo dopo conferma utente.
 
 ### 2026-09-01 — M1 Design: sistemazione finale asset in corso
 - Confermato `icon-source.png` come master raster PNG dell'icona approvata.
