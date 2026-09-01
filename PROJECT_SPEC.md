@@ -96,9 +96,9 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] Storico prezzi: 2 varianti statiche.
 
 ### Registro e calcoli
-- [~] CRUD rifornimenti + Room.
-- [~] Consumo medio, costo/km, autonomia residua.
-- [~] JUnit e casi limite.
+- [x] CRUD rifornimenti + Room.
+- [x] Consumo medio, costo/km, autonomia residua.
+- [x] JUnit e casi limite.
 
 ### Dati MIMIT
 - [ ] Download/parsing/import.
@@ -172,7 +172,7 @@ Deliverable:
 - [x] verifica reale di due workflow indipendenti riusciti con APK installabili e identico SHA-256 del certificato persistente.
 
 ### M3 — Registro rifornimenti + calcoli
-Stato: **[~] in corso**
+Stato: **[x] fatto**
 
 Decisioni tecniche fissate prima del codice:
 - Room `2.8.4` (`androidx.room`) con KSP `2.3.11`; si resta sulla linea Room 2.x stabile per questa milestone Android-only invece di introdurre contemporaneamente la migrazione a Room 3;
@@ -224,12 +224,14 @@ Sotto-passaggi M3:
 3. **M3.3 — verifica/chiusura**: build reale su `main`, APK firmato con keystore persistente, aggiornamento finale della spec e cleanup branch temporaneo.
 
 Deliverable:
-- [~] Room schema v1 con `VehicleEntity` e `RifornimentoEntity` secondo lo schema sopra;
-- [~] DAO/Repository CRUD e validazioni;
-- [~] consumo medio, costo/km e autonomia residua con rifornimenti parziali gestiti pieno→pieno;
-- [~] test JVM dei casi normali e limite + CRUD Room in-memory;
-- [ ] schermata Compose Registro con add/edit/delete e capacità serbatoio;
-- [ ] CI reale e APK M3 aggiornabile con la chiave persistente già verificata in M2.
+- [x] Room schema v1 con `VehicleEntity` e `RifornimentoEntity` secondo lo schema sopra;
+- [x] DAO/Repository CRUD e validazioni;
+- [x] consumo medio, costo/km e autonomia residua con rifornimenti parziali gestiti pieno→pieno;
+- [x] test JVM dei casi normali e limite + CRUD Room in-memory;
+- [x] schermata Compose Registro con add/edit/delete e capacità serbatoio;
+- [x] CI reale e APK M3 aggiornabile con la chiave persistente già verificata in M2.
+
+Verifica finale M3 su `main`: il run GitHub Actions `33527223004`, head SHA `14df6c15d25cec8d7f5fcdfb0b24e2daac4dda50`, ha completato con successo ripristino del keystore persistente, `testDebugUnitTest`, `assembleDebug`, verifica `apksigner` e upload dell'artifact `w2full-debug-apk` ID `9808283878` (12.507.371 byte, digest ZIP `sha256:ed7a8bbfdbf60572a92988b8222721a965a916a6acaed6082417d911b622b550`). Il certificato APK SHA-256 è `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico a M2 e ai build verificati sul branch M3.
 
 ### M4 — Integrazione dati MIMIT
 Stato: **[ ] da fare**
@@ -310,7 +312,17 @@ La firma debug persistente usa un keystore generato una sola volta e conservato 
 
 La firma persistente è stata verificata il **1 settembre 2026** su due runner GitHub Actions distinti. I run `33501937187` e `33502077657` hanno entrambi eseguito con successo il ripristino del keystore, `testDebugUnitTest`, `assembleDebug`, `apksigner verify` e upload dell'artifact `w2full-debug-apk`. Entrambi gli APK riportano certificato `CN=W2Full Debug, OU=Personal, O=Archimede Projects, C=IT` con SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, confermando che gli APK futuri firmati con questi secret sono aggiornabili senza cambio chiave.
 
+M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `33527223004`: test JVM/Room/parser, build debug, `apksigner` e artifact sono tutti riusciti con lo stesso certificato persistente SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
+
 ## 10. Changelog
+
+### 2026-09-01 — M3 completata
+- Integrato su `main` con fast-forward puro il codice M3 già verificato sul branch `m3-refueling-register`; commit applicativo finale prima della chiusura spec: `14df6c15d25cec8d7f5fcdfb0b24e2daac4dda50`.
+- Completati Room schema v1, CRUD Repository, formule di consumo/costo/autonomia, gestione pieno→pieno con rifornimenti parziali, test JVM/Room e schermata Compose Registro a singola schermata con dialog add/edit/delete e capacità serbatoio.
+- Run finale diretto su `main`: `33527223004`, job `99921047840`, tutti gli step obbligatori `success`.
+- Artifact finale `w2full-debug-apk`: ID `9808283878`, dimensione `12507371` byte, digest ZIP `sha256:ed7a8bbfdbf60572a92988b8222721a965a916a6acaed6082417d911b622b550`.
+- `apksigner` ha verificato una firma v2 con un solo signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico alla chiave persistente M2.
+- M3 chiusa; M4 resta esplicitamente da fare e non è stata avviata.
 
 ### 2026-09-01 — M3 avviata: schema Room e formule fissati
 - M3 marcata in corso prima di modificare codice/configurazione Android.
