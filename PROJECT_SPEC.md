@@ -285,3 +285,21 @@ Dal **1 settembre 2026** i quattro secret risultano configurati dal proprietario
 - Inserita M1 Design prima dello scheletro Android e rinumerate le milestone fino a M7.
 - Aggiornati i riferimenti MIMIT/CI/grafici alla nuova numerazione.
 - Aggiunta sezione Design con palette, tipografia e percorsi asset.
+
+### 2026-08-31 — M0 completata
+- Repository pubblica e scrivibile.
+- Aggiunti spec, README, MIT license e gitignore Android.
+- Definiti nome, vincoli, architettura, modello dati e roadmap iniziale.
+- Verificata fonte MIMIT, URL correnti e separatore `|`.
+- Nessun codice Android, workflow CI o branch temporaneo introdotto.
+
+## 11. Decisioni aperte
+
+- versionamento/naming GitHub Releases e trigger Release;
+- semantica autonomia e unità consumo;
+- rifornimenti parziali;
+- raggio e ordinamento stazioni;
+- permessi posizione minimali;
+- retention storico prezzi;
+- libreria grafici definitiva in M5;
+- schema CSV in M7;
