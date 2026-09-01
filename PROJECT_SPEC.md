@@ -63,12 +63,14 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [ ] GitHub Releases per APK debug.
 
 ### Design
-- [~] Direzione visiva iniziale: **in review**.
-- [x] 4 concept logo/icona 1024×1024 in `design/logo/`.
+- [x] Direzione visiva approvata: **Petrol Night** come tema default dei mockup.
+- [x] Concept icona approvato: gauge con lancetta arancione e identità W2Full.
+- [~] Sorgente icona finale raster PNG 1024×1024 in `design/final/icon-source.png`, senza wordmark esterno.
+- [~] Lockup separato con wordmark in `design/final/logo-lockup.png`.
+- [~] Spostamento dei 3 concept logo scartati in `design/archive/`.
 - [x] Home: 2 varianti statiche.
 - [x] Registro rifornimenti: 2 varianti statiche.
 - [x] Storico prezzi: 2 varianti statiche.
-- [ ] Scelta finale della direzione visiva prima di M2.
 
 ### Registro e calcoli
 - [ ] CRUD rifornimenti + Room.
@@ -91,22 +93,27 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 Stato: **[x] fatto**
 
 ### M1 — Design: logo e mockup
-Stato: **[~] in corso — asset pronti, scelta visuale in attesa**
+Stato: **[~] in corso — aggiustamento finale asset approvato**
 
 Deliverable:
-- [x] 4 concept logo/icona W2Full con canvas **1024×1024**, in `design/logo/`;
+- [x] concept logo/icona W2Full esplorati;
+- [x] scelta finale del concept gauge;
+- [~] `design/final/icon-source.png` — PNG raster 1024×1024, solo icona;
+- [~] `design/final/logo-lockup.png` — lockup con wordmark per README/store;
+- [~] 3 concept scartati archiviati in `design/archive/`;
 - [x] 2 mockup statici Home in `design/mockup/`;
 - [x] 2 mockup statici Registro rifornimenti in `design/mockup/`;
 - [x] 2 mockup statici Storico prezzi in `design/mockup/`;
-- [x] nessun codice app introdotto;
-- [x] sezione Design con palette, tipografia e percorsi;
-- [ ] review umana e scelta direzione prima di M2.
+- [x] **Petrol Night** scelto come tema default dei mockup;
+- [x] nessun codice app introdotto.
 
-Gli asset sono SVG statici/vettoriali; i logo dichiarano `width="1024" height="1024" viewBox="0 0 1024 1024"`.
+L'icona finale è intenzionalmente un asset **raster PNG**, non il corrispondente SVG semplificato: gradienti, riflessi, ombre e profondità 3D del concept approvato non sono replicabili fedelmente con l'SVG scritto a mano usato per le bozze iniziali.
+
+In **M2**, durante lo scaffold Android, questa sorgente dovrà essere trasformata in una **Adaptive Icon** Android con foreground/background separati e safe-zone verificata, mantenendo la resa approvata.
 
 ### M2 — Scheletro Android + CI con APK installabile
 Stato: **[ ] da fare**
-Deliverable: Kotlin, Compose/Material 3, package/applicationId definito prima del codice, target S25, test minimo, CI reale, APK debug e firma stabile.
+Deliverable: Kotlin, Compose/Material 3, package/applicationId definito prima del codice, target S25, test minimo, CI reale, APK debug e firma stabile. Include la derivazione dell'Adaptive Icon Android dalla sorgente approvata in M1.
 
 ### M3 — Registro rifornimenti + calcoli
 Stato: **[ ] da fare**
@@ -130,35 +137,44 @@ Deliverable: CSV, impostazioni, tema, UX errori/permessi/stati vuoti.
 
 M1 produce riferimenti **statici**, non componenti Compose funzionanti.
 
-### Variante A — Petrol Night
+### Tema default — Petrol Night
 Background `#101418`; Surface `#182028`; Primary `#33C3A5`; Secondary `#7FD1FF`; Accent `#FFB84D`; Alert `#FF6B6B`; testo `#F5F7FA` / `#A9B4C2`.
 
-Direzione: scura, tecnica, automotive e data-centric.
+Direzione: scura, tecnica, automotive e data-centric. **Petrol Night è la variante predefinita approvata per i mockup e fungerà da riferimento iniziale per la UI Compose in M2.**
 
-### Variante B — Road Light
+### Variante alternativa — Road Light
 Background `#F6F7F9`; Surface `#FFFFFF`; Primary `#1C6DD0`; Secondary `#25A18E`; Accent `#F59E0B`; Alert `#E45757`; testo `#1F2937` / `#6B7280`.
 
-Direzione: chiara, leggibile, editoriale.
+Direzione: chiara, leggibile, editoriale. Resta come variante/secondo riferimento, non come default.
 
 ### Tipografia
 - Titoli e metriche: Roboto Bold/Medium.
 - UI: Roboto Regular/Medium.
 - Metriche tabellari: Roboto Mono Medium.
 
-### Percorsi asset
-Logo:
-- `design/logo/w2full-logo-concept-01.svg` — gauge / indicatore carburante.
-- `design/logo/w2full-logo-concept-02.svg` — monogramma W2F + goccia.
-- `design/logo/w2full-logo-concept-03.svg` — pompa carburante + wordmark.
-- `design/logo/w2full-logo-concept-04.svg` — strada + goccia in badge circolare.
+### Icona e lockup finali
+- `design/final/icon-source.png` — sorgente ufficiale icona, **PNG raster 1024×1024**, senza wordmark esterno.
+- `design/final/logo-lockup.png` — lockup separato gauge + wordmark W2Full, destinato a README/materiale di presentazione/store.
 
-Mockup:
-- `design/mockup/home-theme-petrol-night.svg`
+La sorgente ufficiale è raster perché il livello di dettaglio approvato (gradienti, ombre, riflessi, effetti metallici/3D) è sostanzialmente superiore agli SVG flat scritti a mano; usare lo SVG semplificato come master visivo produrrebbe una resa diversa da quella approvata.
+
+Nota M2: creare risorse **Adaptive Icon** Android separate (foreground/background), senza modificare l'identità visiva approvata e rispettando le safe-zone delle maschere adattive.
+
+### Concept SVG
+- `design/logo/w2full-logo-concept-01.svg` — gauge, bozza vettoriale semplificata del concept selezionato; non è la sorgente finale dell'icona.
+- `design/archive/w2full-logo-concept-02.svg` — monogramma W2F + goccia, scartato.
+- `design/archive/w2full-logo-concept-03.svg` — pompa carburante + wordmark, scartato.
+- `design/archive/w2full-logo-concept-04.svg` — strada + goccia in badge circolare, scartato.
+
+### Mockup
+- `design/mockup/home-theme-petrol-night.svg` — **default**.
 - `design/mockup/home-theme-road-light.svg`
-- `design/mockup/rifornimenti-theme-petrol-night.svg`
+- `design/mockup/rifornimenti-theme-petrol-night.svg` — **default**.
 - `design/mockup/rifornimenti-theme-road-light.svg`
-- `design/mockup/storico-theme-petrol-night.svg`
+- `design/mockup/storico-theme-petrol-night.svg` — **default**.
 - `design/mockup/storico-theme-road-light.svg`
+
+I mockup SVG restano volutamente wireframe semplici; la qualità visuale definitiva verrà verificata nell'app Compose reale.
 
 ## 8. Fonte dati esterna
 
@@ -177,6 +193,14 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equivalente, verifica APK e upload artifact. Keystore debug generato una volta, codificato in secret, ricostruito nel runner e mai stampato nei log.
 
 ## 10. Changelog
+
+### 2026-09-01 — M1 Design: aggiustamento finale avviato
+- Approvato il concept gauge con lancetta arancione come icona finale.
+- Approvato Petrol Night come tema default dei mockup.
+- Specificato master raster PNG 1024×1024 per preservare gradienti ed effetti 3D.
+- Specificato lockup separato per README/store.
+- Pianificato archivio dei tre concept SVG scartati.
+- Annotata la necessità di derivare Adaptive Icon foreground/background in M2.
 
 ### 2026-08-31 — M1 Design: asset pronti per review
 - Committati 4 concept logo/icona SVG 1024×1024.
@@ -198,7 +222,6 @@ Da M2: GitHub Actions con checkout, toolchain, test, build `assembleDebug` o equ
 
 ## 11. Decisioni aperte
 
-- concept logo e palette da scegliere prima di M2;
 - package/applicationId e SDK definitivi in M2;
 - versionamento/naming APK e trigger Release;
 - secrets keystore;
