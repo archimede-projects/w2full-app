@@ -62,9 +62,9 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 
 ### Fondazioni
 - [x] Repo pubblica e documentazione M0.
-- [~] Scheletro Android Compose.
-- [~] CI con test/build e APK reale.
-- [~] Firma debug persistente da secrets.
+- [x] Scheletro Android Compose.
+- [x] CI con test/build e APK reale.
+- [x] Firma debug persistente da secrets.
 - [ ] GitHub Releases per APK debug.
 
 ### Design
@@ -119,7 +119,7 @@ Il lockup finale è anch'esso un asset raster derivato dall'immagine originale a
 In **M2**, durante lo scaffold Android, questa sorgente dovrà essere trasformata in una **Adaptive Icon** Android con foreground/background separati e safe-zone verificata, mantenendo la resa approvata.
 
 ### M2 — Scheletro Android + CI con APK installabile
-Stato: **[~] in corso**
+Stato: **[x] fatto**
 
 Decisioni tecniche fissate prima del codice:
 - `namespace` / `applicationId`: `com.archimede.w2full`;
@@ -142,16 +142,16 @@ Secrets M2:
 - `W2FULL_DEBUG_KEY_ALIAS` — alias della chiave;
 - `W2FULL_DEBUG_KEY_PASSWORD` — password della chiave.
 
-I quattro repository secret sono stati configurati il **1 settembre 2026**. La configurazione resta da validare tramite due run GitHub Actions indipendenti: entrambi devono eseguire `Restore persistent debug keystore` con esito `success` e produrre APK con lo stesso SHA-256 del certificato di firma.
+I quattro repository secret sono stati configurati il **1 settembre 2026** e verificati in due run GitHub Actions indipendenti. I run `33501937187` e `33502077657`, eseguiti rispettivamente sui runner `1000000224` e `1000000225`, hanno entrambi ripristinato il keystore persistente con esito `success`, superato test/build/verifica APK e prodotto lo stesso certificato SHA-256: `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
 
 Deliverable:
-- [~] scheletro Kotlin + Compose/Material 3 con tema Petrol Night;
-- [~] package/applicationId `com.archimede.w2full`;
-- [~] Adaptive Icon Android derivata dalla sorgente approvata;
-- [~] test JVM minimo;
-- [~] workflow GitHub Actions con JDK 17, Gradle 9.5.0 pinning, test, `assembleDebug`, verifica e upload APK;
-- [~] firma debug persistente tramite i quattro secret definiti sopra;
-- [ ] verifica reale di due workflow indipendenti riusciti con APK installabili e identico SHA-256 del certificato persistente.
+- [x] scheletro Kotlin + Compose/Material 3 con tema Petrol Night;
+- [x] package/applicationId `com.archimede.w2full`;
+- [x] Adaptive Icon Android derivata dalla sorgente approvata;
+- [x] test JVM minimo;
+- [x] workflow GitHub Actions con JDK 17, Gradle 9.5.0 pinning, test, `assembleDebug`, verifica e upload APK;
+- [x] firma debug persistente tramite i quattro secret definiti sopra;
+- [x] verifica reale di due workflow indipendenti riusciti con APK installabili e identico SHA-256 del certificato persistente.
 
 ### M3 — Registro rifornimenti + calcoli
 Stato: **[ ] da fare**
@@ -234,9 +234,17 @@ Toolchain M2: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa
 
 La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato nei log o committato.
 
-Dal **1 settembre 2026** i quattro secret risultano configurati dal proprietario del repository. Prima di chiudere M2 la CI deve confermare in due run indipendenti che il ripristino del keystore avviene realmente e che lo SHA-256 del certificato di firma resta identico tra i due APK.
+La firma persistente è stata verificata il **1 settembre 2026** su due runner GitHub Actions distinti. I run `33501937187` e `33502077657` hanno entrambi eseguito con successo il ripristino del keystore, `testDebugUnitTest`, `assembleDebug`, `apksigner verify` e upload dell'artifact `w2full-debug-apk`. Entrambi gli APK riportano certificato `CN=W2Full Debug, OU=Personal, O=Archimede Projects, C=IT` con SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, confermando che gli APK futuri firmati con questi secret sono aggiornabili senza cambio chiave.
 
 ## 10. Changelog
+
+### 2026-09-01 — M2 completata
+- Completato lo scheletro Android nativo Kotlin + Jetpack Compose + Material 3 con `applicationId` `com.archimede.w2full` e tema Petrol Night.
+- Integrata l'Adaptive Icon derivata dal master M1 e aggiunto il test JVM minimo.
+- Pipeline Android CI verificata con build reale, `apksigner` e artifact APK.
+- Configurato e verificato il keystore debug persistente tramite i quattro GitHub Actions Secrets, senza chiavi nel repository.
+- Run indipendenti `33501937187` e `33502077657` riusciti su runner distinti con identico certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
+- Artifact `w2full-debug-apk` prodotti correttamente; M2 chiusa senza avviare M3.
 
 ### 2026-09-01 — M2: secrets configurati, verifica firma avviata
 - Registrata la configurazione dei quattro GitHub Actions Secrets per il keystore debug persistente.
