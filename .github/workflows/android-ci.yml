@@ -10,6 +10,7 @@ on:
       - m4-eni-filter
       - m4-location-distance
       - m4-nearby-stations-ui
+      - m4-cache-sync
   workflow_dispatch:
 
 permissions:

@@ -1,92 +1,239 @@
 package com.archimede.w2full.data.mimit
 
-import com.archimede.w2full.location.GeoPoint
+import android.content.Context
+import androidx.room.Room
+import androidx.room.withTransaction
+import androidx.test.core.app.ApplicationProvider
+import com.archimede.w2full.data.local.MimitPriceEntity
+import com.archimede.w2full.data.local.MimitStationEntity
+import com.archimede.w2full.data.local.MimitSyncStateEntity
+import com.archimede.w2full.data.local.W2FullDatabase
 import com.archimede.w2full.location.UserLocationProvider
 import com.archimede.w2full.location.UserLocationResult
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class NearbyStationsRepositoryTest {
-    @Test
-    fun sessionRepositoryDownloadsInMemoryAndRanksEniByDistance() = runBlocking {
-        val dataset = MimitDataset(
-            extractionDate = LocalDate.of(2026, 9, 2),
-            rows = listOf(
-                station(id = 1, brand = "Eni", name = "Roma", latitude = 41.9028, longitude = 12.4964),
-                station(id = 2, brand = "Q8", name = "Q8 Roma", latitude = 41.9028, longitude = 12.4964),
-                station(id = 3, brand = "eni", name = "Milano", latitude = 45.4642, longitude = 9.1900),
-            ),
-        )
-        val repository = SessionNearbyStationsRepository(
-            stationSource = MimitStationsDataSource { dataset },
-            distanceService = EniStationDistanceService(
-                FakeLocationProvider(UserLocationResult.Available(GeoPoint(41.9028, 12.4964))),
-            ),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+    private lateinit var database: W2FullDatabase
+    private lateinit var server: MockWebServer
+    private lateinit var logger: RecordingMimitLogger
 
-        val snapshot = repository.loadStations()
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        database = Room.inMemoryDatabaseBuilder(context, W2FullDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        server = MockWebServer()
+        server.start()
+        logger = RecordingMimitLogger()
+    }
 
-        assertEquals(LocalDate.of(2026, 9, 2), snapshot.extractionDate)
-        assertEquals(listOf(1L, 3L), snapshot.rankedStations.stations.map { it.station.id })
-        assertEquals(0.0, snapshot.rankedStations.stations[0].distanceKm!!, 1e-9)
-        assertEquals(476.885, snapshot.rankedStations.stations[1].distanceKm!!, 0.5)
+    @After
+    fun tearDown() {
+        server.close()
+        database.close()
     }
 
     @Test
-    fun deniedPermissionStillReturnsAlphabeticallySortedEniStations() = runBlocking {
-        val dataset = MimitDataset(
-            extractionDate = LocalDate.of(2026, 9, 2),
-            rows = listOf(
-                station(id = 1, brand = "Eni", name = "Zulu", latitude = 41.0, longitude = 12.0),
-                station(id = 2, brand = "Eni", name = "Alpha", latitude = 42.0, longitude = 13.0),
-                station(id = 3, brand = "Q8", name = "Aardvark", latitude = 40.0, longitude = 11.0),
+    fun validCsvAtomicallyReplacesCacheAndUpdatesTimestamp() = runBlocking {
+        seedOldCache()
+        enqueueValidDatasets()
+        val repository = repository()
+
+        val result = repository.refresh()
+
+        assertTrue(result is MimitRefreshResult.Success)
+        assertEquals(NEW_TIMESTAMP, (result as MimitRefreshResult.Success).lastSuccessfulUpdateEpochMillis)
+        assertEquals(listOf(12345L), database.mimitCacheDao().getStations().map { it.stationId })
+        assertEquals(listOf(12345L, 12345L), database.mimitCacheDao().getPrices().map { it.stationId })
+        val state = requireNotNull(database.mimitCacheDao().getSyncState())
+        assertEquals(NEW_TIMESTAMP, state.lastSuccessfulUpdateEpochMillis)
+        assertEquals(LocalDate.of(2026, 9, 1).toEpochDay(), state.stationsExtractionEpochDay)
+        assertEquals(LocalDate.of(2026, 9, 1).toEpochDay(), state.pricesExtractionEpochDay)
+        assertTrue(logger.entries.isEmpty())
+    }
+
+    @Test
+    fun changedHeaderIsInterceptedAndOldCacheAndTimestampStayUntouched() = runBlocking {
+        seedOldCache()
+        server.enqueue(
+            csvResponse(
+                """
+                Estrazione del 2026-09-02
+                idimpianto|Gestore|Bandiera|COLONNA CAMBIATA|Nome Impianto|Indirizzo|Comune|Provincia|Latitudine|Longitudine
+                1|Gestore|Eni|Stradale|Uno|Via Uno|Roma|RM|41.9|12.5
+                """.trimIndent(),
             ),
         )
-        val repository = SessionNearbyStationsRepository(
-            stationSource = MimitStationsDataSource { dataset },
-            distanceService = EniStationDistanceService(
-                FakeLocationProvider(UserLocationResult.PermissionDenied),
+        val repository = repository()
+
+        val result = repository.refresh()
+
+        assertTrue(result is MimitRefreshResult.Failure)
+        assertFalse((result as MimitRefreshResult.Failure).retryable)
+        assertOldCacheUntouched()
+        assertTrue(logger.entries.single().message.contains("Expected header not found"))
+        assertTrue(logger.entries.single().throwable is MimitCsvFormatException)
+    }
+
+    @Test
+    fun priceParseFailureAfterStationDownloadLeavesOldCacheUntouched() = runBlocking {
+        seedOldCache()
+        server.enqueue(csvResponse(resourceText("mimit/anagrafica_sample.csv")))
+        server.enqueue(
+            csvResponse(
+                """
+                Estrazione del 2026-09-02
+                idimpianto|descCarburante|prezzo|isSelf|dtComu
+                12345|Benzina|not-a-price|1|02/09/2026 08:00:00
+                """.trimIndent(),
             ),
+        )
+        val repository = repository()
+
+        val result = repository.refresh()
+
+        assertTrue(result is MimitRefreshResult.Failure)
+        assertFalse((result as MimitRefreshResult.Failure).retryable)
+        assertOldCacheUntouched()
+        val cached = repository.loadCachedSnapshot()
+        assertNotNull(cached)
+        assertEquals(listOf(999L), cached!!.rankedStations.stations.map { it.station.id })
+        assertEquals(OLD_TIMESTAMP, cached.lastSuccessfulUpdateEpochMillis)
+    }
+
+    @Test
+    fun downloadFailureIsRetryableAndLeavesOldCacheAndTimestampUntouched() = runBlocking {
+        seedOldCache()
+        server.enqueue(
+            MockResponse.Builder()
+                .code(503)
+                .body("temporarily unavailable")
+                .build(),
+        )
+        val repository = repository()
+
+        val result = repository.refresh()
+
+        assertTrue(result is MimitRefreshResult.Failure)
+        assertTrue((result as MimitRefreshResult.Failure).retryable)
+        assertOldCacheUntouched()
+        assertTrue(logger.entries.single().message.contains("HTTP 503"))
+    }
+
+    private fun repository(): RoomNearbyStationsRepository {
+        val client = MimitCsvClient(
+            httpClient = OkHttpClient(),
+            stationsUrl = server.url("/stations.csv").toString(),
+            pricesUrl = server.url("/prices.csv").toString(),
+        )
+        return RoomNearbyStationsRepository(
+            database = database,
+            cacheDao = database.mimitCacheDao(),
+            dataSource = client,
+            distanceService = EniStationDistanceService(
+                object : UserLocationProvider {
+                    override suspend fun currentLocation(): UserLocationResult =
+                        UserLocationResult.PermissionDenied
+                },
+            ),
+            logger = logger,
+            clock = Clock.fixed(Instant.ofEpochMilli(NEW_TIMESTAMP), ZoneOffset.UTC),
             ioDispatcher = Dispatchers.Unconfined,
         )
-
-        val snapshot = repository.loadStations()
-
-        assertSame(UserLocationResult.PermissionDenied, snapshot.rankedStations.locationResult)
-        assertEquals(listOf("Alpha", "Zulu"), snapshot.rankedStations.stations.map { it.station.name })
-        assertTrue(snapshot.rankedStations.stations.all { it.distanceKm == null })
-        assertNull(snapshot.rankedStations.stations.first().distanceKm)
     }
 
-    private class FakeLocationProvider(
-        private val result: UserLocationResult,
-    ) : UserLocationProvider {
-        override suspend fun currentLocation(): UserLocationResult = result
+    private suspend fun seedOldCache() {
+        database.withTransaction {
+            database.mimitCacheDao().insertStations(
+                listOf(
+                    MimitStationEntity(
+                        stationId = 999,
+                        manager = "Old manager",
+                        brand = "Eni",
+                        stationType = "Stradale",
+                        name = "Old cached station",
+                        address = "Via Vecchia",
+                        municipality = "Roma",
+                        province = "RM",
+                        latitude = null,
+                        longitude = null,
+                    ),
+                ),
+            )
+            database.mimitCacheDao().insertPrices(
+                listOf(
+                    MimitPriceEntity(
+                        stationId = 999,
+                        fuelDescription = "Benzina",
+                        priceMilliEuroPerUnit = 1_700,
+                        isSelf = true,
+                        communicatedAt = "2026-09-01T08:00:00",
+                    ),
+                ),
+            )
+            database.mimitCacheDao().upsertSyncState(
+                MimitSyncStateEntity(
+                    stationsExtractionEpochDay = LocalDate.of(2026, 8, 31).toEpochDay(),
+                    pricesExtractionEpochDay = LocalDate.of(2026, 8, 31).toEpochDay(),
+                    lastSuccessfulUpdateEpochMillis = OLD_TIMESTAMP,
+                ),
+            )
+        }
     }
 
-    private fun station(
-        id: Long,
-        brand: String,
-        name: String,
-        latitude: Double?,
-        longitude: Double?,
-    ): MimitStation = MimitStation(
-        id = id,
-        manager = "Gestore",
-        brand = brand,
-        stationType = "Stradale",
-        name = name,
-        address = "Via Roma",
-        municipality = "Roma",
-        province = "RM",
-        latitude = latitude,
-        longitude = longitude,
-    )
+    private suspend fun assertOldCacheUntouched() {
+        assertEquals(listOf(999L), database.mimitCacheDao().getStations().map { it.stationId })
+        assertEquals(listOf(999L), database.mimitCacheDao().getPrices().map { it.stationId })
+        assertEquals(OLD_TIMESTAMP, database.mimitCacheDao().getSyncState()?.lastSuccessfulUpdateEpochMillis)
+    }
+
+    private fun enqueueValidDatasets() {
+        server.enqueue(csvResponse(resourceText("mimit/anagrafica_sample.csv")))
+        server.enqueue(csvResponse(resourceText("mimit/prezzi_sample.csv")))
+    }
+
+    private fun csvResponse(body: String): MockResponse = MockResponse.Builder()
+        .addHeader("Content-Type", "text/csv; charset=utf-8")
+        .body(body)
+        .build()
+
+    private fun resourceText(path: String): String = requireNotNull(
+        javaClass.classLoader?.getResource(path),
+    ) { "Missing test resource $path" }.readText()
+
+    private class RecordingMimitLogger : MimitLogger {
+        val entries = mutableListOf<Entry>()
+
+        override fun error(message: String, throwable: Throwable) {
+            entries += Entry(message, throwable)
+        }
+
+        data class Entry(val message: String, val throwable: Throwable)
+    }
+
+    private companion object {
+        const val OLD_TIMESTAMP = 1_700_000_000_000L
+        val NEW_TIMESTAMP: Long = Instant.parse("2026-09-02T07:00:00Z").toEpochMilli()
+    }
 }

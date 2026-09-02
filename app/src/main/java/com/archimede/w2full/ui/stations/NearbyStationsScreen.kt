@@ -74,8 +74,8 @@ fun NearbyStationsRoute() {
     NearbyStationsScreen(
         state = state,
         onRequestLocationPermission = requestLocationPermission,
-        onRetryLocation = viewModel::refresh,
-        onRetryLoad = viewModel::refresh,
+        onRetryLocation = viewModel::refreshLocation,
+        onRefresh = viewModel::refresh,
     )
 }
 
@@ -84,7 +84,7 @@ private fun NearbyStationsScreen(
     state: NearbyStationsUiState,
     onRequestLocationPermission: () -> Unit,
     onRetryLocation: () -> Unit,
-    onRetryLoad: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -108,7 +108,10 @@ private fun NearbyStationsScreen(
         }
 
         item {
-            UpdateStatusCard(state)
+            UpdateStatusCard(
+                state = state,
+                onRefresh = onRefresh,
+            )
         }
 
         item {
@@ -138,8 +141,8 @@ private fun NearbyStationsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(message)
-                        TextButton(onClick = onRetryLoad) {
-                            Text("Riprova")
+                        TextButton(onClick = onRefresh) {
+                            Text("Riprova aggiornamento")
                         }
                     }
                 }
@@ -167,11 +170,14 @@ private fun NearbyStationsScreen(
 }
 
 @Composable
-private fun UpdateStatusCard(state: NearbyStationsUiState) {
+private fun UpdateStatusCard(
+    state: NearbyStationsUiState,
+    onRefresh: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 text = lastUpdateLabel(state.lastSuccessfulUpdateEpochMillis),
@@ -179,10 +185,23 @@ private fun UpdateStatusCard(state: NearbyStationsUiState) {
             )
             state.extractionDate?.let { extractionDate ->
                 Text(
-                    text = "Estrazione MIMIT: $extractionDate",
+                    text = "Estrazione anagrafica: $extractionDate",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            state.pricesExtractionDate?.let { extractionDate ->
+                Text(
+                    text = "Estrazione prezzi: $extractionDate",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(
+                onClick = onRefresh,
+                enabled = !state.isLoading,
+            ) {
+                Text(if (state.isLoading) "Aggiornamento…" else "Aggiorna")
             }
         }
     }
@@ -284,15 +303,37 @@ internal fun locationStatusSubtitle(status: NearbyLocationUiStatus?): String = w
     null -> "Verifica della posizione in corso"
 }
 
-internal fun lastUpdateLabel(epochMillis: Long?): String {
+internal fun lastUpdateLabel(
+    epochMillis: Long?,
+    nowEpochMillis: Long = System.currentTimeMillis(),
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): String {
     if (epochMillis == null) {
         return "Ultimo aggiornamento: non ancora disponibile"
     }
-    val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-    val dateTime = Instant.ofEpochMilli(epochMillis)
-        .atZone(ZoneId.systemDefault())
-        .format(formatter)
-    return "Ultimo aggiornamento: $dateTime"
+
+    val elapsedMillis = (nowEpochMillis - epochMillis).coerceAtLeast(0L)
+    val elapsedHours = elapsedMillis / 3_600_000L
+    val relative = when {
+        elapsedMillis < 3_600_000L -> "Aggiornato pochi minuti fa"
+        elapsedHours < 24L -> if (elapsedHours == 1L) {
+            "Aggiornato 1 ora fa"
+        } else {
+            "Aggiornato $elapsedHours ore fa"
+        }
+        else -> {
+            val elapsedDays = elapsedMillis / 86_400_000L
+            if (elapsedDays == 1L) {
+                "Aggiornato 1 giorno fa"
+            } else {
+                "Aggiornato $elapsedDays giorni fa"
+            }
+        }
+    }
+    val absolute = Instant.ofEpochMilli(epochMillis)
+        .atZone(zoneId)
+        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+    return "$relative · $absolute"
 }
 
 private fun formatDistanceKm(distanceKm: Double): String =

@@ -9,11 +9,11 @@ class MimitCsvClient(
     private val parser: MimitCsvParser = MimitCsvParser(),
     private val stationsUrl: String = MimitEndpoints.STATIONS_URL,
     private val pricesUrl: String = MimitEndpoints.PRICES_URL,
-) : MimitStationsDataSource {
+) : MimitDataSource {
     override fun downloadStations(): MimitDataset<MimitStation> =
         parser.parseStations(downloadText(stationsUrl))
 
-    fun downloadPrices(): MimitDataset<MimitPrice> =
+    override fun downloadPrices(): MimitDataset<MimitPrice> =
         parser.parsePrices(downloadText(pricesUrl))
 
     private fun downloadText(url: String): String {

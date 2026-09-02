@@ -72,6 +72,7 @@ dependencies {
     val lifecycleVersion = "2.11.0"
     val okhttpVersion = "5.5.0"
     val playServicesLocationVersion = "21.4.0"
+    val workVersion = "2.11.2"
 
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.13.0")
@@ -87,6 +88,7 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
     implementation("com.google.android.gms:play-services-location:$playServicesLocationVersion")
+    implementation("androidx.work:work-runtime:$workVersion")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
