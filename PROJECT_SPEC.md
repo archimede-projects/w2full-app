@@ -101,9 +101,9 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] JUnit e casi limite.
 
 ### Dati MIMIT
-- [~] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
+- [x] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
 - [ ] Import locale impianti/prezzi.
-- [ ] Filtro bandiera Eni.
+- [~] Filtro bandiera Eni.
 - [ ] Posizione utente + Haversine.
 - [ ] UI stazioni vicine.
 - [ ] Refresh manuale + WorkManager giornaliero.
@@ -247,7 +247,7 @@ Verifica esterna obbligatoria rifatta il **1 settembre 2026**, prima di qualunqu
 - colonne anagrafica secondo il metadato corrente: `idimpianto`, `Gestore`, `Bandiera`, `Tipo Impianto`, `Nome Impianto`, `Indirizzo`, `Comune`, `Provincia`, `Latitudine`, `Longitudine`; l'asterisco mostrato nel PDF accanto a Latitudine/Longitudine è un richiamo alla nota sulle coordinate volontarie, non viene trattato come parte del nome logico della colonna;
 - non sono emerse differenze sostanziali rispetto agli URL/formato già annotati: la differenza documentale rilevante è che il metadato corrente scrive `idimpianto` tutto minuscolo, mentre dataset/esempi storici mostrano anche `idImpianto`; il parser M4 deve quindi validare i nomi colonna senza distinzione di maiuscole/minuscole, mantenendo invece rigorosi numero e significato delle colonne.
 
-Decisioni tecniche M4.1 — download/parsing, da implementare prima di Eni/posizione/UI:
+Decisioni tecniche M4.1 — download/parsing:
 - OkHttp `5.5.0` per il download HTTPS; nessun download MIMIT reale viene eseguito nei test CI;
 - `versionCode 3`, `versionName 0.3.0-m4`;
 - endpoint centralizzati in una classe/oggetto MIMIT dedicato, senza URL sparsi nella UI;
@@ -259,20 +259,46 @@ Decisioni tecniche M4.1 — download/parsing, da implementare prima di Eni/posiz
 - coordinate anagrafica nullable: i metadati dichiarano che sono volontarie e non sempre verificate; valori vuoti restano `null` senza scartare l'impianto;
 - i test del download usano MockWebServer `5.5.0` alimentato dalle fixture statiche locali, così verificano HTTP + parsing senza dipendere da MIMIT o Internet.
 
+Checkpoint M4.1 confermato il **2 settembre 2026**: commit `256060bef4e6b2af43c274bf810d6f7d4513add2` sul branch `m4-mimit-csv`; run GitHub Actions `33530349742`, job `99931636090`, tutti gli step obbligatori `success`; artifact `w2full-debug-apk` ID `9809511985`, dimensione `13218479` byte, digest ZIP `sha256:6f6bb2f72895cc9e9fc2f55d84a8de19c2edd3fa9bf67e3d8a31152cc0ea258a`; certificato persistente SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`. Il formato live MIMIT è stato inoltre ricontrollato dall'utente il 2 settembre 2026 ed è risultato coerente con header e formato implementati in M4.1.
+
+Decisioni tecniche M4.2 — filtro bandiera Eni:
+- il filtro opera esclusivamente sui `MimitStation` già scaricati e parsati da M4.1; nessuna rete, Room, cache, Repository applicativo, posizione o UI viene introdotta in M4.2;
+- la bandiera viene normalizzata con `trim`, compressione degli spazi interni e confronto case-insensitive via `Locale.ROOT`;
+- è considerata Eni soltanto la bandiera normalizzata esattamente uguale a `eni`; non si usa `contains`, così valori diversi che contengono la sottostringa `eni` non vengono classificati per errore;
+- il filtro preserva l'ordine originale dei record e, quando applicato a `MimitDataset<MimitStation>`, preserva anche `extractionDate`;
+- test dedicati devono coprire `Eni`, varianti di maiuscole/minuscole e spazi, insieme a non-match come `Q8`, `Pompe Bianche`, stringa vuota e valori contenenti ma non uguali a `Eni`.
+
+Requisiti vincolanti M4.5 — resilienza import/cache/sync:
+- ogni refresh è **atomico**: i dati cached vengono sostituiti soltanto dopo download, parsing, validazione e preparazione dell'intero aggiornamento completati con successo; un fallimento parziale non deve mai cancellare o corrompere l'ultima cache valida;
+- errori HTTP/rete, `MimitCsvFormatException`, colonne mancanti/impreviste o qualunque formato MIMIT inatteso devono essere intercettati al confine Repository/sync: l'app non deve crashare e deve continuare a usare gli ultimi dati validi disponibili;
+- in caso di errore con cache esistente, la UI mostra un messaggio non bloccante e non tecnico, ad esempio `Impossibile aggiornare i prezzi al momento`, continuando a visualizzare i dati cached; senza cache valida viene mostrato uno stato vuoto/errore comprensibile, sempre senza crash;
+- la persistenza include `lastSuccessfulUpdateEpochMillis`, aggiornato **solo** dopo un import completamente riuscito; un tentativo fallito non modifica questo timestamp;
+- la UI stazioni mostra sempre l'età dell'ultimo aggiornamento riuscito quando esiste una cache, ad esempio `Aggiornato 3 giorni fa`, derivandola da `lastSuccessfulUpdateEpochMillis`; il timestamp assoluto resta disponibile al modello per eventuale dettaglio data/ora;
+- l'errore tecnico specifico viene registrato localmente in Logcat con tag `W2Full-MIMIT`, includendo exception/stack trace quando disponibile, ma dettagli tecnici e stack trace non vengono esposti all'utente;
+- test M4.5 obbligatori: refresh valido aggiorna cache e timestamp; parsing/header invalido preserva cache e timestamp; HTTP fallito preserva cache e timestamp; dati cached restano disponibili dopo errore; UI espone l'età dell'ultimo successo; errore specifico raggiunge il logger senza finire nel messaggio utente.
+
 Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
-1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. Fermarsi dopo il verde e attendere conferma utente.
-2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati.
+1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. **[x] checkpoint confermato**.
+2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[~] autorizzato**.
 3. **M4.3 — posizione e distanza**: permessi minimali, posizione utente e Haversine, con test della formula indipendenti dalla posizione reale.
 4. **M4.4 — UI stazioni vicine**: stato ViewModel/Repository e schermata Compose; nessun ampliamento a storico/notifiche.
-5. **M4.5 — import/sync**: persistenza dei dati necessari, refresh manuale e WorkManager giornaliero, solo dopo conferma dei passaggi precedenti.
+5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra.
 
 Deliverable M4.1:
-- [ ] client HTTPS per i due endpoint MIMIT;
-- [ ] parser anagrafica e prezzi secondo il contratto sopra;
-- [ ] DTO indipendenti da Room/UI;
-- [ ] fixture statiche sotto `app/src/test/resources/mimit/`;
-- [ ] test JVM parser + MockWebServer senza Internet;
-- [ ] CI branch reale con test, APK e firma persistente verdi.
+- [x] client HTTPS per i due endpoint MIMIT;
+- [x] parser anagrafica e prezzi secondo il contratto sopra;
+- [x] DTO indipendenti da Room/UI;
+- [x] fixture statiche sotto `app/src/test/resources/mimit/`;
+- [x] test JVM parser + MockWebServer senza Internet;
+- [x] CI branch reale con test, APK e firma persistente verdi.
+
+Deliverable M4.2:
+- [ ] filtro puro sui `MimitStation` parsati;
+- [ ] normalizzazione robusta ma confronto semanticamente esatto con `Eni`;
+- [ ] preservazione ordine e `extractionDate`;
+- [ ] test JVM positivi/negativi e casi di normalizzazione;
+- [ ] CI reale sul branch M4.2 con test, APK e firma persistente verdi;
+- [ ] nessuna modifica a cache/persistenza/UI/posizione.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -356,6 +382,11 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.1 confermata, M4.2 avviata e resilienza M4.5 vincolata
+- M4.1 confermata dopo verifica del commit, della CI e del formato CSV live; resta sul lignaggio M4 e non è stata integrata su `main`.
+- Registrati come vincolanti per M4.5 aggiornamento cache atomico, preservazione degli ultimi dati validi su errore, `lastSuccessfulUpdateEpochMillis` aggiornato solo su successo, messaggio utente non tecnico e logging locale `W2Full-MIMIT` dell'errore specifico.
+- M4.2 autorizzata con scope esclusivo sul filtro puro della bandiera `Eni` nei `MimitStation` già parsati; nessuna cache/persistenza/UI/posizione è ammessa in questo sotto-passaggio.
 
 ### 2026-09-01 — M4 avviata: contratto CSV MIMIT riverificato
 - Prima del codice M4 sono stati ricontrollati dal vivo pagina dataset, link CSV e metadato MIMIT corrente: gli URL restano invariati e puntano a risorse `text/csv`.
