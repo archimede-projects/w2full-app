@@ -6,6 +6,7 @@ import com.archimede.w2full.data.local.MimitPriceEntity
 import com.archimede.w2full.data.local.MimitStationEntity
 import com.archimede.w2full.data.local.MimitSyncStateEntity
 import com.archimede.w2full.data.local.W2FullDatabase
+import com.archimede.w2full.location.UserLocationResult
 import java.io.IOException
 import java.time.Clock
 import java.time.LocalDate
@@ -36,6 +37,8 @@ interface NearbyStationsRepository {
 
     suspend fun loadCachedSnapshot(): NearbyStationsSnapshot?
 
+    suspend fun resolveLocation(): UserLocationResult
+
     suspend fun refresh(): MimitRefreshResult
 }
 
@@ -64,6 +67,10 @@ class RoomNearbyStationsRepository(
 
     override suspend fun loadCachedSnapshot(): NearbyStationsSnapshot? = withContext(ioDispatcher) {
         toSnapshot(cacheDao.getStations(), cacheDao.getSyncState())
+    }
+
+    override suspend fun resolveLocation(): UserLocationResult = withContext(ioDispatcher) {
+        distanceService.resolveLocation()
     }
 
     override suspend fun refresh(): MimitRefreshResult = withContext(ioDispatcher) {
