@@ -107,6 +107,7 @@ class NearbyStationsViewModel(
 
     fun refreshLocation() {
         locationJob?.cancel()
+        _uiState.value = _uiState.value.copy(locationStatus = null)
         locationJob = viewModelScope.launch {
             try {
                 val cachedSnapshot = repository.loadCachedSnapshot()
