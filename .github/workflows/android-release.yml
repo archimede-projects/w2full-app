@@ -4,18 +4,26 @@ on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Temporary bootstrap tag; empty on normal tag pushes
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
 
 concurrency:
-  group: android-release-${{ github.ref }}
+  group: android-release-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
   release-debug-apk:
     runs-on: ubuntu-latest
     env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
       W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
       W2FULL_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEYSTORE_PASSWORD }}
       W2FULL_DEBUG_KEY_ALIAS: ${{ secrets.W2FULL_DEBUG_KEY_ALIAS }}
@@ -25,6 +33,8 @@ jobs:
     steps:
       - name: Checkout tagged commit
         uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -90,7 +100,7 @@ jobs:
           set -euo pipefail
           SOURCE_APK="app/build/outputs/apk/debug/app-debug.apk"
           mkdir -p dist
-          RELEASE_APK="dist/w2full-${GITHUB_REF_NAME}-debug.apk"
+          RELEASE_APK="dist/w2full-${RELEASE_TAG}-debug.apk"
           cp "$SOURCE_APK" "$RELEASE_APK"
           test -s "$RELEASE_APK"
           APK_SHA256="$(sha256sum "$RELEASE_APK" | awk '{print $1}')"
@@ -102,9 +112,10 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          name: W2Full ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: W2Full ${{ env.RELEASE_TAG }}
           body: |
-            W2Full debug — `${{ github.ref_name }}`
+            W2Full debug — `${{ env.RELEASE_TAG }}`
 
             Checkpoint/milestone: build taggata documentata in `PROJECT_SPEC.md` al commit `${{ github.sha }}`.
 
@@ -112,6 +123,6 @@ jobs:
             - Build debug APK: riuscita
             - Firma persistente verificata: `${{ env.W2FULL_EXPECTED_CERT_SHA256 }}`
             - APK SHA-256: `${{ steps.package.outputs.apk_sha256 }}`
-          prerelease: ${{ contains(github.ref_name, 'preview') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          prerelease: ${{ contains(env.RELEASE_TAG, 'preview') || contains(env.RELEASE_TAG, 'alpha') || contains(env.RELEASE_TAG, 'beta') || contains(env.RELEASE_TAG, 'rc') }}
           fail_on_unmatched_files: true
           files: ${{ steps.package.outputs.release_apk }}
