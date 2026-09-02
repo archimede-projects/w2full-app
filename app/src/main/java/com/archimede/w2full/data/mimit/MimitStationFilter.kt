@@ -9,13 +9,13 @@ object MimitStationFilter {
     fun eniStations(dataset: MimitDataset<MimitStation>): MimitDataset<MimitStation> =
         dataset.copy(rows = eniStations(dataset.rows))
 
-    fun isEniBrand(brand: String): Boolean = normalizeBrand(brand) == ENI_BRAND
+    fun isEniBrand(brand: String): Boolean = normalizeBrand(brand) in ENI_BRANDS
 
     private fun normalizeBrand(brand: String): String = brand
         .trim()
         .replace(WHITESPACE, " ")
         .lowercase(Locale.ROOT)
 
-    private const val ENI_BRAND = "eni"
+    private val ENI_BRANDS = setOf("eni", "agip eni")
     private val WHITESPACE = Regex("\\s+")
 }
