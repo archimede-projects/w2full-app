@@ -104,7 +104,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
 - [ ] Import locale impianti/prezzi.
 - [x] Filtro bandiera Eni.
-- [~] Posizione utente + Haversine.
+- [x] Posizione utente + Haversine.
 - [ ] UI stazioni vicine.
 - [ ] Refresh manuale + WorkManager giornaliero.
 
@@ -282,6 +282,8 @@ Decisioni tecniche M4.3 — posizione utente e distanza:
 - il livello di servizio M4.3 deve intercettare errori non di cancellazione provenienti dal provider e degradare a `Unavailable`, così un problema di localizzazione non interrompe l'app;
 - test JVM obbligatori: Haversine stesso punto/rotta nota/simmetria; coordinate station mancanti/invalide; ranking per distanza; tie/fallback alfabetico; permesso negato; posizione non disponibile; provider che fallisce; esclusione delle stazioni non Eni.
 
+Verifica M4.3 sul branch `m4-location-distance`: HEAD applicativo/CI `872fc1b0f180a77838c7ec4a5ac75b817aefa7a6`; run GitHub Actions `33597805710`, job `100144721666`, tutti gli step obbligatori `success`; `testDebugUnitTest` e `assembleDebug` entrambi `BUILD SUCCESSFUL`; artifact `w2full-debug-apk` ID `9834047769`, dimensione `13799932` byte, digest ZIP `sha256:864421ad44b5379d6c897dd33dac9a509c8a9db77965f4f382c085bac22a80a4`; firma APK v2 con un signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico alle milestone precedenti. Il codice M4.3 resta confinato al branch e non è integrato su `main`.
+
 Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 - ogni refresh è **atomico**: i dati cached vengono sostituiti soltanto dopo download, parsing, validazione e preparazione dell'intero aggiornamento completati con successo; un fallimento parziale non deve mai cancellare o corrompere l'ultima cache valida;
 - errori HTTP/rete, `MimitCsvFormatException`, colonne mancanti/impreviste o qualunque formato MIMIT inatteso devono essere intercettati al confine Repository/sync: l'app non deve crashare e deve continuare a usare gli ultimi dati validi disponibili;
@@ -294,7 +296,7 @@ Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
 1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. **[x] checkpoint confermato**.
 2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] checkpoint confermato**.
-3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[~] autorizzato**.
+3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[x] implementato e CI branch verde; in attesa di conferma utente**.
 4. **M4.4 — UI stazioni vicine**: stato ViewModel/Repository e schermata Compose; nessun ampliamento a storico/notifiche.
 5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra.
 
@@ -315,13 +317,13 @@ Deliverable M4.2:
 - [x] nessuna modifica a cache/persistenza/UI/posizione.
 
 Deliverable M4.3:
-- [ ] `GeoPoint` + Haversine puro e validato;
-- [ ] provider `FusedLocationProviderClient` con esiti `Available` / `PermissionDenied` / `Unavailable` e nessun crash su errore;
-- [ ] ranking delle sole stazioni Eni per distanza, con coordinate mancanti/invalide gestite come distanza non disponibile;
-- [ ] fallback alfabetico deterministico quando la posizione non è disponibile o il permesso è negato;
-- [ ] test JVM dei calcoli, ranking e fallback senza dipendenza da posizione reale;
-- [ ] CI reale sul branch M4.3 con test, APK e firma persistente verdi;
-- [ ] nessuna modifica a UI, cache/Room, import o WorkManager.
+- [x] `GeoPoint` + Haversine puro e validato;
+- [x] provider `FusedLocationProviderClient` con esiti `Available` / `PermissionDenied` / `Unavailable` e nessun crash su errore;
+- [x] ranking delle sole stazioni Eni per distanza, con coordinate mancanti/invalide gestite come distanza non disponibile;
+- [x] fallback alfabetico deterministico quando la posizione non è disponibile o il permesso è negato;
+- [x] test JVM dei calcoli, ranking e fallback senza dipendenza da posizione reale;
+- [x] CI reale sul branch M4.3 con test, APK e firma persistente verdi;
+- [x] nessuna modifica a UI, cache/Room, import o WorkManager.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -405,6 +407,13 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.3 implementata e verificata sul branch
+- Aggiunti `GeoPoint`, Haversine e provider `FusedLocationProviderClient` resiliente con esiti `Available`, `PermissionDenied` e `Unavailable`; solo permessi foreground `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION`, nessun background location.
+- Aggiunto ranking delle sole stazioni Eni già filtrate da M4.2: distanza crescente quando la posizione è disponibile; coordinate assenti/invalide in coda; senza posizione tutte le distanze restano `null` e viene usato fallback alfabetico deterministico.
+- Test JVM coprono rotta Haversine nota, simmetria, coordinate invalide, esclusione non-Eni, ordinamento per distanza, permesso negato, posizione unavailable, failure provider e propagazione della cancellazione.
+- Run branch `33597805710`, job `100144721666`, completamente verde; artifact `9834047769`, dimensione `13799932` byte, digest `sha256:864421ad44b5379d6c897dd33dac9a509c8a9db77965f4f382c085bac22a80a4`; certificato persistente invariato `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
+- M4.3 resta sul branch `m4-location-distance`; nessuna UI, cache/Room, import o WorkManager è stata introdotta e M4.4/M4.5 non sono stati avviati.
 
 ### 2026-09-02 — M4.2 confermata, M4.3 avviata
 - M4.2 confermata dall'utente dopo verifica del codice reale e del confronto esatto `eni`.
