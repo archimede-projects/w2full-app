@@ -4,7 +4,9 @@ import com.archimede.w2full.location.GeoPoint
 import com.archimede.w2full.location.UserLocationProvider
 import com.archimede.w2full.location.UserLocationResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -14,11 +16,11 @@ import org.junit.Test
 
 class EniStationDistanceServiceTest {
     @Test
-    fun availableLocationFiltersEniAndOrdersByDistance() = runBlocking {
+    fun availableLocationFiltersEniAliasesAndOrdersByDistance() = runBlocking {
         val stations = listOf(
             station(id = 1, brand = "Eni", name = "Roma", latitude = 41.9028, longitude = 12.4964),
             station(id = 2, brand = "Q8", name = "Q8 Roma", latitude = 41.9028, longitude = 12.4964),
-            station(id = 3, brand = " ENI ", name = "Milano", latitude = 45.4642, longitude = 9.1900),
+            station(id = 3, brand = "Agip Eni", name = "Milano", latitude = 45.4642, longitude = 9.1900),
             station(id = 4, brand = "eni", name = "Senza coordinate", latitude = null, longitude = null),
         )
         val service = EniStationDistanceService(
@@ -54,7 +56,7 @@ class EniStationDistanceServiceTest {
         val service = EniStationDistanceService(FakeLocationProvider(UserLocationResult.PermissionDenied))
         val stations = listOf(
             station(id = 1, brand = "Eni", name = "Zulu", latitude = 41.0, longitude = 12.0),
-            station(id = 2, brand = "Eni", name = "Alpha", latitude = 42.0, longitude = 13.0),
+            station(id = 2, brand = "Agip Eni", name = "Alpha", latitude = 42.0, longitude = 13.0),
             station(id = 3, brand = "Q8", name = "Aardvark", latitude = 40.0, longitude = 11.0),
         )
 
@@ -70,7 +72,7 @@ class EniStationDistanceServiceTest {
         val service = EniStationDistanceService(FakeLocationProvider(UserLocationResult.Unavailable))
         val stations = listOf(
             station(id = 1, brand = "Eni", name = "Zulu", address = "Via Z", municipality = "Roma"),
-            station(id = 2, brand = "Eni", name = "", address = "Beta", municipality = "Milano"),
+            station(id = 2, brand = "Agip Eni", name = "", address = "Beta", municipality = "Milano"),
             station(id = 3, brand = "Eni", name = "Alpha", address = "Via A", municipality = "Torino"),
         )
 
@@ -100,6 +102,22 @@ class EniStationDistanceServiceTest {
 
         assertSame(UserLocationResult.Unavailable, result.locationResult)
         assertEquals(listOf("Alpha", "Bravo"), result.stations.map { it.station.name })
+    }
+
+    @Test
+    fun providerThatNeverCompletesTimesOutToUnavailable() = runBlocking {
+        val service = EniStationDistanceService(
+            userLocationProvider = object : UserLocationProvider {
+                override suspend fun currentLocation(): UserLocationResult = awaitCancellation()
+            },
+            locationTimeoutMillis = 20L,
+        )
+
+        val result = withTimeout(1_000L) {
+            service.resolveLocation()
+        }
+
+        assertSame(UserLocationResult.Unavailable, result)
     }
 
     @Test
