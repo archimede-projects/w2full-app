@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -24,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -88,75 +86,81 @@ private fun NearbyStationsScreen(
     onRetryLocation: () -> Unit,
     onRetryLoad: () -> Unit,
 ) {
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "W2Full",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = "Stazioni Eni vicine",
-            style = MaterialTheme.typography.titleLarge,
-        )
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "W2Full",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = "Stazioni Eni vicine",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+        }
 
-        UpdateStatusCard(state)
-        LocationStatusCard(
-            status = state.locationStatus,
-            onRequestLocationPermission = onRequestLocationPermission,
-            onRetryLocation = onRetryLocation,
-        )
+        item {
+            UpdateStatusCard(state)
+        }
+
+        item {
+            LocationStatusCard(
+                status = state.locationStatus,
+                onRequestLocationPermission = onRequestLocationPermission,
+                onRetryLocation = onRetryLocation,
+            )
+        }
 
         if (state.isLoading) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator()
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
             }
         }
 
         state.errorMessage?.let { message ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(message)
-                    TextButton(onClick = onRetryLoad) {
-                        Text("Riprova")
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(message)
+                        TextButton(onClick = onRetryLoad) {
+                            Text("Riprova")
+                        }
                     }
                 }
             }
         }
 
-        when {
-            state.stations.isNotEmpty() -> {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(
-                        items = state.stations,
-                        key = { it.station.id },
-                    ) { item ->
-                        StationCard(item)
-                    }
-                }
-            }
-
-            !state.isLoading && state.errorMessage == null -> {
+        if (state.stations.isEmpty() && !state.isLoading && state.errorMessage == null) {
+            item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Nessuna stazione Eni disponibile.",
                         modifier = Modifier.padding(14.dp),
                     )
                 }
+            }
+        } else {
+            items(
+                items = state.stations,
+                key = { it.station.id },
+            ) { item ->
+                StationCard(item)
             }
         }
     }
@@ -191,17 +195,13 @@ private fun LocationStatusCard(
     onRetryLocation: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = locationStatusTitle(status),
                     style = MaterialTheme.typography.labelLarge,
@@ -216,13 +216,13 @@ private fun LocationStatusCard(
             when (status) {
                 NearbyLocationUiStatus.PERMISSION_DENIED -> {
                     Button(onClick = onRequestLocationPermission) {
-                        Text("Consenti")
+                        Text("Consenti posizione")
                     }
                 }
 
                 NearbyLocationUiStatus.UNAVAILABLE -> {
                     TextButton(onClick = onRetryLocation) {
-                        Text("Riprova")
+                        Text("Riprova posizione")
                     }
                 }
 
