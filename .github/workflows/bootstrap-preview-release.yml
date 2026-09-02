@@ -1,0 +1,43 @@
+name: Bootstrap Preview Release
+
+on:
+  push:
+    branches:
+      - release-distribution
+
+permissions:
+  contents: write
+
+jobs:
+  create-preview-tag:
+    if: ${{ github.event.head_commit.message == 'chore(release): bootstrap v0.4.5-preview' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout bootstrap commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Create one-time preview tag
+        shell: bash
+        env:
+          TAG: v0.4.5-preview
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists; refusing to overwrite it."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "W2Full M4.5 preview" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+          echo "Created $TAG at $GITHUB_SHA"
+
+  publish-preview:
+    if: ${{ github.event.head_commit.message == 'chore(release): bootstrap v0.4.5-preview' }}
+    needs: create-preview-tag
+    uses: ./.github/workflows/android-release.yml
+    with:
+      release_tag: v0.4.5-preview
+    secrets: inherit
