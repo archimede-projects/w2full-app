@@ -36,7 +36,7 @@ jobs:
 
   publish-preview:
     needs: create-preview-tag
-    uses: archimede-projects/w2full-app/.github/workflows/android-release.yml@release-distribution
+    uses: $/.github/workflows/android-release.yml
     with:
       release_tag: v0.4.5-preview
     secrets:
