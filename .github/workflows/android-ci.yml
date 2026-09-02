@@ -8,6 +8,7 @@ on:
       - m3-refueling-register
       - m4-mimit-csv
       - m4-eni-filter
+      - m4-location-distance
   workflow_dispatch:
 
 permissions:
