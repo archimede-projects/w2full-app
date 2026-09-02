@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -71,6 +72,35 @@ class NearbyStationsRepositoryTest {
         assertEquals(LocalDate.of(2026, 9, 1).toEpochDay(), state.stationsExtractionEpochDay)
         assertEquals(LocalDate.of(2026, 9, 1).toEpochDay(), state.pricesExtractionEpochDay)
         assertTrue(logger.entries.isEmpty())
+    }
+
+    @Test
+    fun liveAgipEniBrandRefreshesInsteadOfProducingEmptyEniSet() = runBlocking {
+        server.enqueue(
+            csvResponse(
+                """
+                Estrazione del 2026-09-01
+                idImpianto|Gestore|Bandiera|Tipo Impianto|Nome Impianto|Indirizzo|Comune|Provincia|Latitudine|Longitudine
+                555|Gestore|Agip Eni|Stradale|Eni Test|Via Test|Roma|RM|41.9|12.5
+                """.trimIndent(),
+            ),
+        )
+        server.enqueue(
+            csvResponse(
+                """
+                Estrazione del 2026-09-01
+                idImpianto|descCarburante|prezzo|isSelf|dtComu
+                555|Benzina|1.789|1|01/09/2026 08:00:00
+                """.trimIndent(),
+            ),
+        )
+        val repository = repository()
+
+        val result = repository.refresh()
+
+        assertTrue(result is MimitRefreshResult.Success)
+        assertEquals(listOf(555L), database.mimitCacheDao().getStations().map { it.stationId })
+        assertEquals("Agip Eni", database.mimitCacheDao().getStations().single().brand)
     }
 
     @Test
@@ -141,7 +171,27 @@ class NearbyStationsRepositoryTest {
         assertTrue(logger.entries.single().message.contains("HTTP 503"))
     }
 
-    private fun repository(): RoomNearbyStationsRepository {
+    @Test
+    fun locationCanResolveAfterRefreshFailureWithNoCache() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(503)
+                .body("temporarily unavailable")
+                .build(),
+        )
+        val repository = repository(locationResult = UserLocationResult.PermissionDenied)
+
+        val refreshResult = repository.refresh()
+        val locationResult = repository.resolveLocation()
+
+        assertTrue(refreshResult is MimitRefreshResult.Failure)
+        assertSame(UserLocationResult.PermissionDenied, locationResult)
+        assertTrue(database.mimitCacheDao().getStations().isEmpty())
+    }
+
+    private fun repository(
+        locationResult: UserLocationResult = UserLocationResult.PermissionDenied,
+    ): RoomNearbyStationsRepository {
         val client = MimitCsvClient(
             httpClient = OkHttpClient(),
             stationsUrl = server.url("/stations.csv").toString(),
@@ -153,8 +203,7 @@ class NearbyStationsRepositoryTest {
             dataSource = client,
             distanceService = EniStationDistanceService(
                 object : UserLocationProvider {
-                    override suspend fun currentLocation(): UserLocationResult =
-                        UserLocationResult.PermissionDenied
+                    override suspend fun currentLocation(): UserLocationResult = locationResult
                 },
             ),
             logger = logger,
