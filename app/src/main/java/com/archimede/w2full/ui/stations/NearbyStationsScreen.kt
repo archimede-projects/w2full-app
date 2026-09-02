@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archimede.w2full.W2FullApplication
 import com.archimede.w2full.data.mimit.MimitStationDistance
+import com.archimede.w2full.data.mimit.MimitStationFuelPrice
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -163,7 +164,11 @@ private fun NearbyStationsScreen(
                 items = state.stations,
                 key = { it.station.id },
             ) { item ->
-                StationCard(item)
+                StationCard(
+                    item = item,
+                    selectedFuelType = state.selectedFuelType,
+                    price = state.pricesByStationId[item.station.id],
+                )
             }
         }
     }
@@ -254,7 +259,11 @@ private fun LocationStatusCard(
 }
 
 @Composable
-private fun StationCard(item: MimitStationDistance) {
+private fun StationCard(
+    item: MimitStationDistance,
+    selectedFuelType: String,
+    price: MimitStationFuelPrice?,
+) {
     val station = item.station
     val title = station.name.ifBlank { "Stazione Eni #${station.id}" }
     val address = listOf(
@@ -274,6 +283,15 @@ private fun StationCard(item: MimitStationDistance) {
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = selectedFuelType,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Text(
+                text = formatStationFuelPrice(price),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = address,
@@ -334,6 +352,25 @@ internal fun lastUpdateLabel(
         .atZone(zoneId)
         .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
     return "$relative · $absolute"
+}
+
+internal fun formatStationFuelPrice(price: MimitStationFuelPrice?): String {
+    if (price == null) return "Prezzo non disponibile"
+    val values = buildList {
+        price.self?.let {
+            add("Self ${formatPriceMilliEuro(it.priceMilliEuroPerUnit)} ${price.unit.label}")
+        }
+        price.served?.let {
+            add("Servito ${formatPriceMilliEuro(it.priceMilliEuroPerUnit)} ${price.unit.label}")
+        }
+    }
+    return values.joinToString(" · ").ifBlank { "Prezzo non disponibile" }
+}
+
+internal fun formatPriceMilliEuro(priceMilliEuroPerUnit: Long): String {
+    val whole = priceMilliEuroPerUnit / 1_000L
+    val fraction = priceMilliEuroPerUnit % 1_000L
+    return String.format(Locale.ITALY, "%d,%03d", whole, fraction)
 }
 
 private fun formatDistanceKm(distanceKm: Double): String =

@@ -1,8 +1,12 @@
 package com.archimede.w2full.ui.stations
 
+import com.archimede.w2full.data.mimit.MimitPriceUnit
+import com.archimede.w2full.data.mimit.MimitSelectedModePrice
 import com.archimede.w2full.data.mimit.MimitStation
 import com.archimede.w2full.data.mimit.MimitStationDistance
+import com.archimede.w2full.data.mimit.MimitStationFuelPrice
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,7 +64,36 @@ class NearbyStationsUiTextTest {
     }
 
     @Test
-    fun refreshFailureKeepsCachedStationsAndTimestampAndUsesOnlyGenericMessage() {
+    fun stationPriceShowsSelfAndServedWithThreeDecimals() {
+        val price = MimitStationFuelPrice(
+            fuelType = "Benzina",
+            unit = MimitPriceUnit.LITER,
+            self = MimitSelectedModePrice(1_759, LocalDateTime.parse("2026-09-02T08:00:00")),
+            served = MimitSelectedModePrice(1_899, LocalDateTime.parse("2026-09-02T09:00:00")),
+        )
+
+        assertEquals("1,759", formatPriceMilliEuro(1_759))
+        assertEquals(
+            "Self 1,759 €/L · Servito 1,899 €/L",
+            formatStationFuelPrice(price),
+        )
+    }
+
+    @Test
+    fun stationPriceSupportsSingleModeMetanoAndUnavailableFallback() {
+        val metano = MimitStationFuelPrice(
+            fuelType = "Metano",
+            unit = MimitPriceUnit.KILOGRAM,
+            self = MimitSelectedModePrice(1_299, LocalDateTime.parse("2026-09-02T08:00:00")),
+            served = null,
+        )
+
+        assertEquals("Self 1,299 €/kg", formatStationFuelPrice(metano))
+        assertEquals("Prezzo non disponibile", formatStationFuelPrice(null))
+    }
+
+    @Test
+    fun refreshFailureKeepsCachedStationsTimestampAndPricesAndUsesOnlyGenericMessage() {
         val cachedStation = MimitStationDistance(
             station = MimitStation(
                 id = 1,
@@ -76,15 +109,23 @@ class NearbyStationsUiTextTest {
             ),
             distanceKm = null,
         )
+        val cachedPrice = MimitStationFuelPrice(
+            fuelType = "Benzina",
+            unit = MimitPriceUnit.LITER,
+            self = MimitSelectedModePrice(1_759, LocalDateTime.parse("2026-09-02T08:00:00")),
+            served = null,
+        )
         val timestamp = Instant.parse("2026-09-01T07:00:00Z").toEpochMilli()
         val state = NearbyStationsUiState(
             stations = listOf(cachedStation),
             lastSuccessfulUpdateEpochMillis = timestamp,
+            pricesByStationId = mapOf(1L to cachedPrice),
         ).withRefreshFailure()
         val errorMessage = requireNotNull(state.errorMessage)
 
         assertEquals(listOf(1L), state.stations.map { it.station.id })
         assertEquals(timestamp, state.lastSuccessfulUpdateEpochMillis)
+        assertEquals(1_759, state.pricesByStationId[1]?.self?.priceMilliEuroPerUnit)
         assertEquals(MIMIT_REFRESH_ERROR_MESSAGE, errorMessage)
         assertFalse(errorMessage.contains("Exception", ignoreCase = true))
         assertFalse(errorMessage.contains("header", ignoreCase = true))

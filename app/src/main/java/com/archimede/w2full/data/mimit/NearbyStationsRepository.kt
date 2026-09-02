@@ -5,11 +5,15 @@ import com.archimede.w2full.data.local.MimitCacheDao
 import com.archimede.w2full.data.local.MimitPriceEntity
 import com.archimede.w2full.data.local.MimitStationEntity
 import com.archimede.w2full.data.local.MimitSyncStateEntity
+import com.archimede.w2full.data.local.VehicleDao
+import com.archimede.w2full.data.local.VehicleEntity
 import com.archimede.w2full.data.local.W2FullDatabase
+import com.archimede.w2full.domain.model.Rifornimento
 import com.archimede.w2full.location.UserLocationResult
 import java.io.IOException
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -25,6 +29,8 @@ data class NearbyStationsSnapshot(
     val pricesExtractionDate: LocalDate,
     val rankedStations: RankedEniStations,
     val lastSuccessfulUpdateEpochMillis: Long,
+    val selectedFuelType: String = MimitStationPriceSelector.FALLBACK_FUEL_TYPE,
+    val pricesByStationId: Map<Long, MimitStationFuelPrice> = emptyMap(),
 )
 
 sealed interface MimitRefreshResult {
@@ -47,6 +53,7 @@ class MimitCacheValidationException(message: String) : IllegalArgumentException(
 class RoomNearbyStationsRepository(
     private val database: W2FullDatabase,
     private val cacheDao: MimitCacheDao,
+    private val vehicleDao: VehicleDao,
     private val dataSource: MimitDataSource,
     private val distanceService: EniStationDistanceService,
     private val logger: MimitLogger,
@@ -56,17 +63,29 @@ class RoomNearbyStationsRepository(
     override fun observeStations(): Flow<NearbyStationsSnapshot?> =
         combine(
             cacheDao.observeStations(),
+            cacheDao.observePrices(),
             cacheDao.observeSyncState(),
-        ) { stations, syncState ->
-            stations to syncState
+            vehicleDao.observeById(Rifornimento.DEFAULT_VEHICLE_ID),
+        ) { stations, prices, syncState, vehicle ->
+            SnapshotInput(stations, prices, syncState, vehicle)
         }
-            .map { (stations, syncState) ->
-                toSnapshot(stations, syncState)
+            .map { input ->
+                toSnapshot(
+                    stationEntities = input.stations,
+                    priceEntities = input.prices,
+                    syncState = input.syncState,
+                    vehicle = input.vehicle,
+                )
             }
             .flowOn(ioDispatcher)
 
     override suspend fun loadCachedSnapshot(): NearbyStationsSnapshot? = withContext(ioDispatcher) {
-        toSnapshot(cacheDao.getStations(), cacheDao.getSyncState())
+        toSnapshot(
+            stationEntities = cacheDao.getStations(),
+            priceEntities = cacheDao.getPrices(),
+            syncState = cacheDao.getSyncState(),
+            vehicle = vehicleDao.getById(Rifornimento.DEFAULT_VEHICLE_ID),
+        )
     }
 
     override suspend fun resolveLocation(): UserLocationResult = withContext(ioDispatcher) {
@@ -120,15 +139,23 @@ class RoomNearbyStationsRepository(
 
     private suspend fun toSnapshot(
         stationEntities: List<MimitStationEntity>,
+        priceEntities: List<MimitPriceEntity>,
         syncState: MimitSyncStateEntity?,
+        vehicle: VehicleEntity?,
     ): NearbyStationsSnapshot? {
         if (stationEntities.isEmpty() || syncState == null) return null
         val stations = stationEntities.map { it.toModel() }
+        val priceSelection = MimitStationPriceSelector.select(
+            prices = priceEntities.map { it.toModel() },
+            defaultFuelType = vehicle?.defaultFuelType,
+        )
         return NearbyStationsSnapshot(
             extractionDate = LocalDate.ofEpochDay(syncState.stationsExtractionEpochDay),
             pricesExtractionDate = LocalDate.ofEpochDay(syncState.pricesExtractionEpochDay),
             rankedStations = distanceService.rank(stations),
             lastSuccessfulUpdateEpochMillis = syncState.lastSuccessfulUpdateEpochMillis,
+            selectedFuelType = priceSelection.fuelType,
+            pricesByStationId = priceSelection.pricesByStationId,
         )
     }
 
@@ -160,6 +187,13 @@ class RoomNearbyStationsRepository(
             throw MimitCacheValidationException("Duplicate Eni price rows in price dataset")
         }
     }
+
+    private data class SnapshotInput(
+        val stations: List<MimitStationEntity>,
+        val prices: List<MimitPriceEntity>,
+        val syncState: MimitSyncStateEntity?,
+        val vehicle: VehicleEntity?,
+    )
 
     private data class PriceKey(
         val stationId: Long,
@@ -200,5 +234,13 @@ class RoomNearbyStationsRepository(
         priceMilliEuroPerUnit = priceMilliEuroPerUnit,
         isSelf = isSelf,
         communicatedAt = communicatedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+    )
+
+    private fun MimitPriceEntity.toModel(): MimitPrice = MimitPrice(
+        stationId = stationId,
+        fuelDescription = fuelDescription,
+        priceMilliEuroPerUnit = priceMilliEuroPerUnit,
+        isSelf = isSelf,
+        communicatedAt = LocalDateTime.parse(communicatedAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME),
     )
 }

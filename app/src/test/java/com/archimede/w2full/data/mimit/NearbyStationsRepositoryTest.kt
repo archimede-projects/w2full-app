@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.archimede.w2full.data.local.MimitPriceEntity
 import com.archimede.w2full.data.local.MimitStationEntity
 import com.archimede.w2full.data.local.MimitSyncStateEntity
+import com.archimede.w2full.data.local.VehicleEntity
 import com.archimede.w2full.data.local.W2FullDatabase
 import com.archimede.w2full.location.UserLocationProvider
 import com.archimede.w2full.location.UserLocationResult
@@ -23,6 +24,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -101,6 +103,51 @@ class NearbyStationsRepositoryTest {
         assertTrue(result is MimitRefreshResult.Success)
         assertEquals(listOf(555L), database.mimitCacheDao().getStations().map { it.stationId })
         assertEquals("Agip Eni", database.mimitCacheDao().getStations().single().brand)
+    }
+
+    @Test
+    fun cachedSnapshotUsesVehicleDefaultFuelAndNewestPrices() = runBlocking {
+        seedOldCache()
+        database.vehicleDao().insertIfAbsent(
+            VehicleEntity(
+                id = 1,
+                name = "Veicolo",
+                defaultFuelType = "  GASOLIO ",
+                tankCapacityMilliliters = null,
+            ),
+        )
+        database.mimitCacheDao().insertPrices(
+            listOf(
+                MimitPriceEntity(999, "Gasolio", 1_600, true, "2026-09-01T08:00:00"),
+                MimitPriceEntity(999, "gasolio", 1_650, true, "2026-09-02T08:00:00"),
+                MimitPriceEntity(999, "Gasolio", 1_799, false, "2026-09-02T09:00:00"),
+                MimitPriceEntity(999, "Gasolio Plus", 1_100, false, "2026-09-02T10:00:00"),
+            ),
+        )
+
+        val snapshot = requireNotNull(repository().loadCachedSnapshot())
+        val selected = requireNotNull(snapshot.pricesByStationId[999])
+
+        assertEquals("GASOLIO", snapshot.selectedFuelType)
+        assertEquals(1_650, selected.self?.priceMilliEuroPerUnit)
+        assertEquals(1_799, selected.served?.priceMilliEuroPerUnit)
+        assertEquals(MimitPriceUnit.LITER, selected.unit)
+    }
+
+    @Test
+    fun missingVehicleFallsBackToBenzinaAndMissingCompatibleFuelStaysUnavailable() = runBlocking {
+        seedOldCache()
+        val fallback = requireNotNull(repository().loadCachedSnapshot())
+
+        assertEquals(MimitStationPriceSelector.FALLBACK_FUEL_TYPE, fallback.selectedFuelType)
+        assertEquals(1_700, fallback.pricesByStationId[999]?.self?.priceMilliEuroPerUnit)
+
+        database.mimitCacheDao().clearPrices()
+        database.mimitCacheDao().insertPrices(
+            listOf(MimitPriceEntity(999, "Gasolio", 1_600, true, "2026-09-02T08:00:00")),
+        )
+        val withoutCompatiblePrice = requireNotNull(repository().loadCachedSnapshot())
+        assertNull(withoutCompatiblePrice.pricesByStationId[999])
     }
 
     @Test
@@ -200,6 +247,7 @@ class NearbyStationsRepositoryTest {
         return RoomNearbyStationsRepository(
             database = database,
             cacheDao = database.mimitCacheDao(),
+            vehicleDao = database.vehicleDao(),
             dataSource = client,
             distanceService = EniStationDistanceService(
                 object : UserLocationProvider {

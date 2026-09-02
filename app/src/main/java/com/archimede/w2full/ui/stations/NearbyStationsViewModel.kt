@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.archimede.w2full.data.mimit.MimitRefreshResult
 import com.archimede.w2full.data.mimit.MimitStationDistance
+import com.archimede.w2full.data.mimit.MimitStationFuelPrice
+import com.archimede.w2full.data.mimit.MimitStationPriceSelector
 import com.archimede.w2full.data.mimit.NearbyStationsRepository
 import com.archimede.w2full.data.mimit.NearbyStationsSnapshot
 import com.archimede.w2full.location.UserLocationResult
@@ -32,6 +34,8 @@ data class NearbyStationsUiState(
     val extractionDate: LocalDate? = null,
     val pricesExtractionDate: LocalDate? = null,
     val lastSuccessfulUpdateEpochMillis: Long? = null,
+    val selectedFuelType: String = MimitStationPriceSelector.FALLBACK_FUEL_TYPE,
+    val pricesByStationId: Map<Long, MimitStationFuelPrice> = emptyMap(),
     val errorMessage: String? = null,
 )
 
@@ -135,6 +139,8 @@ class NearbyStationsViewModel(
             extractionDate = snapshot.extractionDate,
             pricesExtractionDate = snapshot.pricesExtractionDate,
             lastSuccessfulUpdateEpochMillis = snapshot.lastSuccessfulUpdateEpochMillis,
+            selectedFuelType = snapshot.selectedFuelType,
+            pricesByStationId = snapshot.pricesByStationId,
         )
     }
 

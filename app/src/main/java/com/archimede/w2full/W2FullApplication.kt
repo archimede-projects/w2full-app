@@ -26,6 +26,7 @@ class W2FullApplication : Application() {
         RoomNearbyStationsRepository(
             database = database,
             cacheDao = database.mimitCacheDao(),
+            vehicleDao = database.vehicleDao(),
             dataSource = MimitCsvClient(),
             distanceService = EniStationDistanceService(
                 userLocationProvider = FusedUserLocationProvider(this),
