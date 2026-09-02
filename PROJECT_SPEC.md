@@ -105,7 +105,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [ ] Import locale impianti/prezzi.
 - [x] Filtro bandiera Eni.
 - [x] Posizione utente + Haversine.
-- [ ] UI stazioni vicine.
+- [~] UI stazioni vicine.
 - [ ] Refresh manuale + WorkManager giornaliero.
 
 ### Storico/notifiche/rifiniture
@@ -284,6 +284,20 @@ Decisioni tecniche M4.3 — posizione utente e distanza:
 
 Verifica M4.3 sul branch `m4-location-distance`: HEAD applicativo/CI `872fc1b0f180a77838c7ec4a5ac75b817aefa7a6`; run GitHub Actions `33597805710`, job `100144721666`, tutti gli step obbligatori `success`; `testDebugUnitTest` e `assembleDebug` entrambi `BUILD SUCCESSFUL`; artifact `w2full-debug-apk` ID `9834047769`, dimensione `13799932` byte, digest ZIP `sha256:864421ad44b5379d6c897dd33dac9a509c8a9db77965f4f382c085bac22a80a4`; firma APK v2 con un signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico alle milestone precedenti. Il codice M4.3 resta confinato al branch e non è integrato su `main`.
 
+Il checkpoint M4.3 è stato confermato dall'utente il **2 settembre 2026** dopo verifica del codice, del manifest con soli permessi foreground e ricalcolo indipendente Roma–Milano pari a circa `476,9 km`.
+
+Decisioni tecniche M4.4 — UI stazioni vicine:
+- viene introdotta una navigazione Compose minima a due destinazioni, `Registro` e `Stazioni`, senza aggiungere una libreria Navigation: lo stato di destinazione resta locale all'app shell e M4.4 non modifica il flusso CRUD M3;
+- la schermata `Stazioni` usa un `NearbyStationsViewModel` e un repository temporaneo **non persistente**: in produzione scarica l'anagrafica MIMIT via `MimitCsvClient` su dispatcher IO e passa i record al ranking M4.3; non scrive Room, file o cache e non introduce WorkManager;
+- i test M4.4 non effettuano download MIMIT reali: ViewModel/repository sono testati con sorgenti/fake in memoria o fixture statiche già presenti;
+- la route Compose richiede runtime `ACCESS_COARSE_LOCATION` e `ACCESS_FINE_LOCATION` tramite Activity Result API quando nessuno dei due è già concesso; dopo il risultato, anche un rifiuto avvia comunque il caricamento delle stazioni, così `PermissionDenied` usa il fallback alfabetico M4.3 invece di bloccare la lista;
+- se la posizione è disponibile, la UI mostra stato `Posizione disponibile` e la lista Eni ordinata per distanza crescente; se il permesso è negato mostra stato `Permesso posizione negato` e lista alfabetica; se il provider restituisce `Unavailable` mostra `Posizione non disponibile` e lista alfabetica. Nessuno dei tre stati deve causare crash;
+- quando il permesso è negato, la schermata espone un'azione esplicita per richiedere nuovamente il permesso; non esiste loop automatico di richieste dopo un rifiuto;
+- ogni riga stazione mostra almeno nome (o fallback leggibile), indirizzo/comune/provincia e distanza formattata quando presente; con `distanceKm = null` mostra `Distanza non disponibile`;
+- lo stato UI include già `lastSuccessfulUpdateEpochMillis: Long?` per il requisito M4.5. In M4.4 resta `null` perché non esiste ancora cache persistente e la schermata riserva comunque lo spazio con testo placeholder `Ultimo aggiornamento: non ancora disponibile`; M4.5 sostituirà il placeholder con l'età derivata dal timestamp persistito;
+- errori di download/parsing nella sessione M4.4 diventano uno stato UI non tecnico (`Impossibile caricare le stazioni al momento`) e non provocano crash; la resilienza con cache valida resta responsabilità M4.5;
+- M4.4 non introduce prezzi persistiti, import locale, schema Room, cache, `lastSuccessfulUpdateEpochMillis` persistito, refresh schedulato o WorkManager.
+
 Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 - ogni refresh è **atomico**: i dati cached vengono sostituiti soltanto dopo download, parsing, validazione e preparazione dell'intero aggiornamento completati con successo; un fallimento parziale non deve mai cancellare o corrompere l'ultima cache valida;
 - errori HTTP/rete, `MimitCsvFormatException`, colonne mancanti/impreviste o qualunque formato MIMIT inatteso devono essere intercettati al confine Repository/sync: l'app non deve crashare e deve continuare a usare gli ultimi dati validi disponibili;
@@ -296,8 +310,8 @@ Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
 1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. **[x] checkpoint confermato**.
 2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] checkpoint confermato**.
-3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[x] implementato e CI branch verde; in attesa di conferma utente**.
-4. **M4.4 — UI stazioni vicine**: stato ViewModel/Repository e schermata Compose; nessun ampliamento a storico/notifiche.
+3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[x] checkpoint confermato**.
+4. **M4.4 — UI stazioni vicine**: richiesta permesso runtime, stato ViewModel/repository non persistente, lista Compose Eni con ranking M4.3 e spazio `ultimo aggiornamento`; nessuna cache/Room/WorkManager. **[~] autorizzato**.
 5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra.
 
 Deliverable M4.1:
@@ -324,6 +338,17 @@ Deliverable M4.3:
 - [x] test JVM dei calcoli, ranking e fallback senza dipendenza da posizione reale;
 - [x] CI reale sul branch M4.3 con test, APK e firma persistente verdi;
 - [x] nessuna modifica a UI, cache/Room, import o WorkManager.
+
+Deliverable M4.4:
+- [ ] navigazione minima `Registro` / `Stazioni` senza dipendenza Navigation aggiuntiva;
+- [ ] richiesta runtime COARSE/FINE con gestione esplicita disponibile/negato/non disponibile e possibilità di riprovare dopo rifiuto;
+- [ ] `NearbyStationsViewModel` + repository sessione non persistente, senza Room/cache/WorkManager;
+- [ ] lista Eni coerente con ranking M4.3: distanza crescente quando disponibile, fallback alfabetico altrimenti;
+- [ ] stato/lista resilienti a permesso negato, provider unavailable e download fallito, senza crash;
+- [ ] spazio `Ultimo aggiornamento` già presente con `lastSuccessfulUpdateEpochMillis` nullable e placeholder finché M4.5 non persiste il dato;
+- [ ] test JVM pertinenti senza rete pubblica;
+- [ ] CI reale sul branch M4.4 con test, APK e firma persistente verdi;
+- [ ] nessuna modifica a schema Room/cache/import persistente/WorkManager.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -398,7 +423,7 @@ Da M2: GitHub Actions con checkout, JDK 17, Gradle 9.5.0 installato e pinning tr
 
 Toolchain M2/M3/M4: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
 
-La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato nei log o committato.
+La firma debug persistente usa un keystore generato una sola volta e conservato esclusivamente come Base64 in `W2FULL_DEBUG_KEYSTORE_BASE64`; le password e l'alias sono separati nei secret `W2FULL_DEBUG_KEYSTORE_PASSWORD`, `W2FULL_DEBUG_KEY_ALIAS`, `W2FULL_DEBUG_KEY_PASSWORD`. Il workflow ricostruisce il file sotto `$RUNNER_TEMP`, lo usa per la `signingConfig` debug e lo elimina a fine job. Nessun contenuto dei secret va stampato o committato.
 
 La firma persistente è stata verificata il **1 settembre 2026** su due runner GitHub Actions distinti. I run `33501937187` e `33502077657` hanno entrambi eseguito con successo il ripristino del keystore, `testDebugUnitTest`, `assembleDebug`, `apksigner verify` e upload dell'artifact `w2full-debug-apk`. Entrambi gli APK riportano certificato `CN=W2Full Debug, OU=Personal, O=Archimede Projects, C=IT` con SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, confermando che gli APK futuri firmati con questi secret sono aggiornabili senza cambio chiave.
 
@@ -407,6 +432,11 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.3 confermata, M4.4 avviata
+- M4.3 confermata dall'utente dopo verifica del codice, dei soli permessi foreground nel manifest e ricalcolo indipendente Roma–Milano (`476,9 km`).
+- M4.4 autorizzata: schermata Stazioni, richiesta runtime posizione, lista Eni ordinata secondo M4.3 e spazio `Ultimo aggiornamento` già predisposto.
+- M4.4 usa soltanto dati di sessione: nessuna cache/Room/WorkManager o persistenza MIMIT; `lastSuccessfulUpdateEpochMillis` resta nullable/placeholder fino a M4.5.
 
 ### 2026-09-02 — M4.3 implementata e verificata sul branch
 - Aggiunti `GeoPoint`, Haversine e provider `FusedLocationProviderClient` resiliente con esiti `Available`, `PermissionDenied` e `Unavailable`; solo permessi foreground `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION`, nessun background location.
