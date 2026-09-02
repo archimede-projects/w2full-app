@@ -103,7 +103,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 ### Dati MIMIT
 - [x] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
 - [ ] Import locale impianti/prezzi.
-- [~] Filtro bandiera Eni.
+- [x] Filtro bandiera Eni.
 - [ ] Posizione utente + Haversine.
 - [ ] UI stazioni vicine.
 - [ ] Refresh manuale + WorkManager giornaliero.
@@ -268,6 +268,8 @@ Decisioni tecniche M4.2 — filtro bandiera Eni:
 - il filtro preserva l'ordine originale dei record e, quando applicato a `MimitDataset<MimitStation>`, preserva anche `extractionDate`;
 - test dedicati devono coprire `Eni`, varianti di maiuscole/minuscole e spazi, insieme a non-match come `Q8`, `Pompe Bianche`, stringa vuota e valori contenenti ma non uguali a `Eni`.
 
+Verifica M4.2 sul branch `m4-eni-filter`: commit applicativo `997b9ccca6b1be962751fdb3b8ece048983438b4`; run GitHub Actions `33596403891`, job `100140620391`, tutti gli step obbligatori `success`; `testDebugUnitTest` e `assembleDebug` entrambi `BUILD SUCCESSFUL`; artifact `w2full-debug-apk` ID `9833570963`, dimensione `13219188` byte, digest ZIP `sha256:8963c06b15cf9b97b1606e2d9dbde50aeb816c424e9bc4ffd75378cdc1bd5549`; firma APK v2 con un signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico a M2/M3/M4.1.
+
 Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 - ogni refresh è **atomico**: i dati cached vengono sostituiti soltanto dopo download, parsing, validazione e preparazione dell'intero aggiornamento completati con successo; un fallimento parziale non deve mai cancellare o corrompere l'ultima cache valida;
 - errori HTTP/rete, `MimitCsvFormatException`, colonne mancanti/impreviste o qualunque formato MIMIT inatteso devono essere intercettati al confine Repository/sync: l'app non deve crashare e deve continuare a usare gli ultimi dati validi disponibili;
@@ -279,7 +281,7 @@ Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 
 Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
 1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. **[x] checkpoint confermato**.
-2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[~] autorizzato**.
+2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] implementato e CI branch verde; in attesa di conferma utente**.
 3. **M4.3 — posizione e distanza**: permessi minimali, posizione utente e Haversine, con test della formula indipendenti dalla posizione reale.
 4. **M4.4 — UI stazioni vicine**: stato ViewModel/Repository e schermata Compose; nessun ampliamento a storico/notifiche.
 5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra.
@@ -293,12 +295,12 @@ Deliverable M4.1:
 - [x] CI branch reale con test, APK e firma persistente verdi.
 
 Deliverable M4.2:
-- [ ] filtro puro sui `MimitStation` parsati;
-- [ ] normalizzazione robusta ma confronto semanticamente esatto con `Eni`;
-- [ ] preservazione ordine e `extractionDate`;
-- [ ] test JVM positivi/negativi e casi di normalizzazione;
-- [ ] CI reale sul branch M4.2 con test, APK e firma persistente verdi;
-- [ ] nessuna modifica a cache/persistenza/UI/posizione.
+- [x] filtro puro sui `MimitStation` parsati;
+- [x] normalizzazione robusta ma confronto semanticamente esatto con `Eni`;
+- [x] preservazione ordine e `extractionDate`;
+- [x] test JVM positivi/negativi e casi di normalizzazione;
+- [x] CI reale sul branch M4.2 con test, APK e firma persistente verdi;
+- [x] nessuna modifica a cache/persistenza/UI/posizione.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -382,6 +384,12 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.2 implementata e verificata sul branch
+- Aggiunto `MimitStationFilter` come filtro puro dei `MimitStation` già parsati da M4.1: match esatto della bandiera normalizzata `Eni`, preservazione ordine e `extractionDate`, nessuna dipendenza da rete/cache/UI/posizione.
+- Aggiunti test JVM per varianti case/whitespace, non-match e preservazione dell'ordine/dataset.
+- Run branch `33596403891`, job `100140620391`, completamente verde; artifact `9833570963`, digest `sha256:8963c06b15cf9b97b1606e2d9dbde50aeb816c424e9bc4ffd75378cdc1bd5549`; certificato persistente invariato `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
+- M4.2 resta sul branch `m4-eni-filter` e non viene integrata su `main` prima della conferma utente.
 
 ### 2026-09-02 — M4.1 confermata, M4.2 avviata e resilienza M4.5 vincolata
 - M4.1 confermata dopo verifica del commit, della CI e del formato CSV live; resta sul lignaggio M4 e non è stata integrata su `main`.
