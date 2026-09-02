@@ -73,6 +73,7 @@ class NearbyStationsViewModel(
 
     fun refresh() {
         hasLoadedOnce = true
+        refreshLocation()
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
@@ -108,7 +109,14 @@ class NearbyStationsViewModel(
         locationJob?.cancel()
         locationJob = viewModelScope.launch {
             try {
-                repository.loadCachedSnapshot()?.let(::applySnapshot)
+                val cachedSnapshot = repository.loadCachedSnapshot()
+                if (cachedSnapshot != null) {
+                    applySnapshot(cachedSnapshot)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        locationStatus = repository.resolveLocation().toUiStatus(),
+                    )
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
