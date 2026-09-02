@@ -6,6 +6,7 @@ import com.archimede.w2full.location.UserLocationProvider
 import com.archimede.w2full.location.UserLocationResult
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class MimitStationDistance(
     val station: MimitStation,
@@ -19,21 +20,33 @@ data class RankedEniStations(
 
 class EniStationDistanceService(
     private val userLocationProvider: UserLocationProvider,
+    private val locationTimeoutMillis: Long = DEFAULT_LOCATION_TIMEOUT_MILLIS,
 ) {
-    suspend fun rank(stations: List<MimitStation>): RankedEniStations {
-        val locationResult = try {
-            userLocationProvider.currentLocation()
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
-            UserLocationResult.Unavailable
-        }
+    init {
+        require(locationTimeoutMillis > 0L) { "locationTimeoutMillis must be positive" }
+    }
 
+    suspend fun resolveLocation(): UserLocationResult = try {
+        withTimeoutOrNull(locationTimeoutMillis) {
+            userLocationProvider.currentLocation()
+        } ?: UserLocationResult.Unavailable
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
+        UserLocationResult.Unavailable
+    }
+
+    suspend fun rank(stations: List<MimitStation>): RankedEniStations {
+        val locationResult = resolveLocation()
         val userPoint = (locationResult as? UserLocationResult.Available)?.point
         return RankedEniStations(
             locationResult = locationResult,
             stations = EniStationDistanceRanker.rank(stations, userPoint),
         )
+    }
+
+    companion object {
+        const val DEFAULT_LOCATION_TIMEOUT_MILLIS = 12_000L
     }
 }
 
