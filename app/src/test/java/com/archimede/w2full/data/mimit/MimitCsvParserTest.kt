@@ -33,6 +33,51 @@ class MimitCsvParserTest {
     }
 
     @Test
+    fun repairsKnownLiveUnescapedStationTextFragment() {
+        val text = """
+            Estrazione del 2026-09-01
+            idImpianto|Gestore|Bandiera|Tipo Impianto|Nome Impianto|Indirizzo|Comune|Provincia|Latitudine|Longitudine
+            40820|STOIL SIMPLE|Pompe Bianche|Stradale|STOIL SIMPLE | gestori.prezzibenzina.it|STR. PROV.LE 82 SPINETTA SALE  15122|ALESSANDRIA|AL|44.91704718250436|8.70067298412323
+        """.trimIndent()
+
+        val station = parser.parseStations(text).rows.single()
+
+        assertEquals(40820L, station.id)
+        assertEquals("STOIL SIMPLE | gestori.prezzibenzina.it", station.name)
+        assertEquals("STR. PROV.LE 82 SPINETTA SALE  15122", station.address)
+    }
+
+    @Test
+    fun repairsTwoKnownLiveFragmentsInSameStationRecord() {
+        val text = """
+            Estrazione del 2026-09-01
+            idImpianto|Gestore|Bandiera|Tipo Impianto|Nome Impianto|Indirizzo|Comune|Provincia|Latitudine|Longitudine
+            54386|PRADELLI - MONTEOMBRARO | gestori.prezzibenzina.it|Pompe Bianche|Stradale|PRADELLI - MONTEOMBRARO | gestori.prezzibenzina.it|Via dei Martiri 255 41059|ZOCCA|MO|44.37912317059676|11.004677838023897
+        """.trimIndent()
+
+        val station = parser.parseStations(text).rows.single()
+
+        assertEquals("PRADELLI - MONTEOMBRARO | gestori.prezzibenzina.it", station.manager)
+        assertEquals("PRADELLI - MONTEOMBRARO | gestori.prezzibenzina.it", station.name)
+        assertEquals("Via dei Martiri 255 41059", station.address)
+    }
+
+    @Test
+    fun stillRejectsUnknownExtraStationField() {
+        val text = """
+            Estrazione del 2026-09-01
+            idImpianto|Gestore|Bandiera|Tipo Impianto|Nome Impianto|Indirizzo|Comune|Provincia|Latitudine|Longitudine
+            1|Gestore|Eni|Stradale|Nome|campo-extra-sconosciuto|Via Uno|Roma|RM|41.9|12.5
+        """.trimIndent()
+
+        val error = assertThrows(MimitCsvFormatException::class.java) {
+            parser.parseStations(text)
+        }
+
+        assertTrue(error.message.orEmpty().contains("11 fields; expected 10"))
+    }
+
+    @Test
     fun parsesPriceFixtureWithoutFloatingPointPersistenceLoss() {
         val dataset = parser.parsePrices(resourceText("mimit/prezzi_sample.csv"))
 
