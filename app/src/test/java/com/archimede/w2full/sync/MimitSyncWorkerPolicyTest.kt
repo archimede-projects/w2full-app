@@ -3,6 +3,7 @@ package com.archimede.w2full.sync
 import com.archimede.w2full.data.mimit.MimitRefreshResult
 import com.archimede.w2full.data.mimit.NearbyStationsRepository
 import com.archimede.w2full.data.mimit.NearbyStationsSnapshot
+import com.archimede.w2full.location.UserLocationResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -33,6 +34,8 @@ class MimitSyncWorkerPolicyTest {
         override fun observeStations(): Flow<NearbyStationsSnapshot?> = flowOf(null)
 
         override suspend fun loadCachedSnapshot(): NearbyStationsSnapshot? = null
+
+        override suspend fun resolveLocation(): UserLocationResult = UserLocationResult.Unavailable
 
         override suspend fun refresh(): MimitRefreshResult {
             refreshCalls += 1
