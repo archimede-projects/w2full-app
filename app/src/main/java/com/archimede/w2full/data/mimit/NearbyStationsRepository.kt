@@ -81,8 +81,8 @@ class RoomNearbyStationsRepository(
                 eniPrices = eniPrices,
             )
 
-            val stationEntities = eniStations.map(MimitStation::toEntity)
-            val priceEntities = eniPrices.map(MimitPrice::toEntity)
+            val stationEntities = eniStations.map { it.toEntity() }
+            val priceEntities = eniPrices.map { it.toEntity() }
             val successfulAt = clock.millis()
             val syncState = MimitSyncStateEntity(
                 stationsExtractionEpochDay = stationDataset.extractionDate.toEpochDay(),
@@ -116,7 +116,7 @@ class RoomNearbyStationsRepository(
         syncState: MimitSyncStateEntity?,
     ): NearbyStationsSnapshot? {
         if (stationEntities.isEmpty() || syncState == null) return null
-        val stations = stationEntities.map(MimitStationEntity::toModel)
+        val stations = stationEntities.map { it.toModel() }
         return NearbyStationsSnapshot(
             extractionDate = LocalDate.ofEpochDay(syncState.stationsExtractionEpochDay),
             pricesExtractionDate = LocalDate.ofEpochDay(syncState.pricesExtractionEpochDay),
