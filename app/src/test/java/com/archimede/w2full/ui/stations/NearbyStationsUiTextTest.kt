@@ -81,11 +81,12 @@ class NearbyStationsUiTextTest {
             stations = listOf(cachedStation),
             lastSuccessfulUpdateEpochMillis = timestamp,
         ).withRefreshFailure()
+        val errorMessage = requireNotNull(state.errorMessage)
 
         assertEquals(listOf(1L), state.stations.map { it.station.id })
         assertEquals(timestamp, state.lastSuccessfulUpdateEpochMillis)
-        assertEquals(MIMIT_REFRESH_ERROR_MESSAGE, state.errorMessage)
-        assertFalse(state.errorMessage!!.contains("Exception", ignoreCase = true))
-        assertFalse(state.errorMessage!!.contains("header", ignoreCase = true))
+        assertEquals(MIMIT_REFRESH_ERROR_MESSAGE, errorMessage)
+        assertFalse(errorMessage.contains("Exception", ignoreCase = true))
+        assertFalse(errorMessage.contains("header", ignoreCase = true))
     }
 }

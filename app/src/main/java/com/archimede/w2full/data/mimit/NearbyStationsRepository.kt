@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 data class NearbyStationsSnapshot(
@@ -57,7 +57,7 @@ class RoomNearbyStationsRepository(
         ) { stations, syncState ->
             stations to syncState
         }
-            .mapLatest { (stations, syncState) ->
+            .map { (stations, syncState) ->
                 toSnapshot(stations, syncState)
             }
             .flowOn(ioDispatcher)
