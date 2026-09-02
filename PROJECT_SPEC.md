@@ -12,7 +12,7 @@ Obiettivi: registro rifornimenti; consumo medio, costo/km e autonomia residua; i
 
 - 100% gratuita, nessuna carta di credito o servizio a pagamento.
 - Nessun account, backend o cloud per i dati utente.
-- Distribuzione solo APK / GitHub Releases, non Play Store.
+- Distribuzione installabile **esclusivamente tramite APK allegato a una GitHub Release taggata**; niente Play Store. Gli artifact GitHub Actions possono restare come evidenza/verifica interna dei singoli commit, ma non sono il canale da cui l'utente scarica o installa l'app.
 - Kotlin + Jetpack Compose + Material 3, dark mode.
 - `applicationId` e namespace: `com.archimede.w2full`.
 - Target principale Samsung Galaxy S25.
@@ -25,7 +25,7 @@ Obiettivi: registro rifornimenti; consumo medio, costo/km e autonomia residua; i
 - Rete solo per CSV MIMIT via OkHttp.
 - Room locale; WorkManager per sync; FusedLocationProviderClient + Haversine; NotificationCompat.
 - Debug APK aggiornabile sopra il precedente tramite keystore persistente conservato come secret, mai nel repository.
-- Quando esiste codice Android, la CI deve produrre un APK reale.
+- Quando esiste codice Android, la CI deve produrre e verificare un APK reale; la **pubblicazione/distribuzione** dell'APK avviene soltanto da un push di tag `v*` tramite workflow GitHub Release dedicato, mai a ogni commit su `main`.
 
 ## 3. Architettura
 
@@ -83,7 +83,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] Scheletro Android Compose.
 - [x] CI con test/build e APK reale.
 - [x] Firma debug persistente da secrets.
-- [ ] GitHub Releases per APK debug.
+- [~] GitHub Releases taggate come unico canale di distribuzione degli APK debug; artifact Actions ammessi soltanto per verifica interna. Checkpoint infrastrutturale in corso sul branch `release-distribution`.
 
 ### Design
 - [x] Direzione visiva approvata: **Petrol Night** come tema default dei mockup.
@@ -154,7 +154,7 @@ Decisioni tecniche fissate prima del codice:
 - Gradle 9.5.0 viene installato in CI tramite `gradle/actions/setup-gradle@v4` con versione esplicitamente fissata; M2 non dipende da un wrapper binario committato;
 - adaptive icon derivata da `design/final/icon-source.png`, preservando la sorgente M1 e usando un foreground con safe-zone e background Petrol Night;
 - test JVM minimo obbligatorio in CI prima di `assembleDebug`;
-- APK CI caricato come artifact GitHub Actions e verificato come file `.apk` non vuoto;
+- gli artifact APK di GitHub Actions sono soltanto evidenza tecnica interna del run; il requisito permanente di distribuzione è l'APK allegato a una GitHub Release creata esclusivamente da un tag `v*`;
 - firma debug persistente ricostruita solo nel runner da GitHub Actions Secrets, senza file di chiave nel repository.
 
 Secrets M2:
@@ -170,7 +170,7 @@ Deliverable:
 - [x] package/applicationId `com.archimede.w2full`;
 - [x] Adaptive Icon Android derivata dalla sorgente approvata;
 - [x] test JVM minimo;
-- [x] workflow GitHub Actions con JDK 17, Gradle 9.5.0 pinning, test, `assembleDebug`, verifica e upload APK;
+- [x] workflow GitHub Actions con JDK 17, Gradle 9.5.0 pinning, test, `assembleDebug`, verifica e artifact APK interno al run;
 - [x] firma debug persistente tramite i quattro secret definiti sopra;
 - [x] verifica reale di due workflow indipendenti riusciti con APK installabili e identico SHA-256 del certificato persistente.
 
@@ -394,6 +394,20 @@ Stato: **[ ] da fare**
 Stato: **[ ] da fare**
 Deliverable: CSV, impostazioni, tema, UX errori/permessi/stati vuoti.
 
+### Checkpoint infrastrutturale — distribuzione APK tramite GitHub Releases
+Stato: **[~] in corso**
+
+Decisioni fissate prima del workflow:
+- il canale installabile ufficiale di W2Full è esclusivamente GitHub Releases; gli artifact di GitHub Actions restano facoltativi e sono considerati soltanto output tecnico interno dei run;
+- workflow dedicato `.github/workflows/android-release.yml`, attivato esclusivamente da `push` di tag con prefisso `v`; nessuna Release viene creata a ogni commit o push su `main`;
+- ogni run di Release deve ripetere `testDebugUnitTest`, `assembleDebug`, verifica `apksigner` e controllo del certificato SHA-256 persistente prima della pubblicazione;
+- i quattro secret del keystore persistente sono obbligatori nel workflow Release: se uno manca, il run deve fallire invece di ricadere sulla chiave debug effimera;
+- il certificato atteso resta `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e viene verificato esplicitamente prima della Release;
+- l'APK allegato alla Release usa un nome versionato derivato dal tag (`w2full-<tag>-debug.apk`) e la Release usa il tag come nome/versione, con note sintetiche che rimandano al checkpoint/milestone documentato in `PROJECT_SPEC.md` al commit taggato;
+- `softprops/action-gh-release` usa la linea v3 mantenuta per Node 24; il workflow pinna v3.0.1 al commit `718ea10b132b3b2eba29c1007bb80653f286566b`, evitando il regressione noto di v3.0.2 nel lookup di release con grandi liste di metadati;
+- la prima prova end-to-end usa il tag `v0.4.5-preview` sul lignaggio M4.5 già verde. La Release di prova deve essere verificata realmente prima di marcare questo checkpoint `[x]`;
+- il meccanismo usato soltanto per creare il primo tag di prova, se necessario per i limiti degli strumenti disponibili, è temporaneo e deve essere rimosso dopo la prova; la creazione della GitHub Release resta comunque esclusivamente conseguenza del push del tag.
+
 ## 7. Design
 
 M1 produce riferimenti **statici**, non componenti Compose funzionanti.
@@ -453,7 +467,9 @@ Dal **10 febbraio 2026** il separatore per “Anagrafica alle 8” e “Prezzi a
 
 ## 9. CI/CD
 
-Da M2: GitHub Actions con checkout, JDK 17, Gradle 9.5.0 installato e pinning tramite `gradle/actions/setup-gradle@v4`, test JVM, build `assembleDebug`, verifica dell'APK e upload artifact. Non viene committato un Gradle Wrapper binario in M2: il runner usa la distribuzione Gradle fissata dalla pipeline, evitando un JAR wrapper generato o trasferito fuori dal normale flusso sorgente.
+Da M2: GitHub Actions con checkout, JDK 17, Gradle 9.5.0 installato e pinning tramite `gradle/actions/setup-gradle@v4`, test JVM, build `assembleDebug`, verifica dell'APK e artifact Actions interno al run. Gli artifact possono essere conservati per verifica tecnica dei singoli commit, ma **non costituiscono distribuzione** e non sono il percorso previsto per scaricare/installare W2Full.
+
+La distribuzione APK usa un workflow GitHub Release dedicato e separato: solo un push di tag `v*` esegue nuovamente test, build, ripristino obbligatorio del keystore persistente, verifica `apksigner`/certificato e pubblicazione dell'APK versionato in una GitHub Release. Il workflow ha `permissions: contents: write` limitato al job di Release e usa `softprops/action-gh-release` v3.0.1 pinning al commit `718ea10b132b3b2eba29c1007bb80653f286566b`. Nessun push ordinario su `main` crea una Release.
 
 Toolchain M2/M3/M4: AGP 9.3.0 + Gradle 9.5.0 + `compileSdk/targetSdk 37`. Non si fissa manualmente `buildToolsVersion`: viene usata la versione predefinita compatibile con AGP.
 
@@ -466,6 +482,13 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — distribuzione GitHub Releases avviata come checkpoint isolato
+- Avviato sul branch dedicato `release-distribution` un intervento infrastrutturale separato da M4/M4.5 e senza modifiche a `main`.
+- Fissato il requisito permanente: gli APK installabili vengono distribuiti esclusivamente come asset di GitHub Releases taggate; gli artifact Actions restano ammessi soltanto per verifica interna dei run.
+- Fissato trigger Release esclusivamente su push di tag `v*`, con test/build/verifica firma ripetuti dal commit taggato e keystore persistente obbligatorio.
+- Scelta `softprops/action-gh-release` v3.0.1 pinning `718ea10b132b3b2eba29c1007bb80653f286566b`; prima prova prevista con tag `v0.4.5-preview` sul lignaggio M4.5 verde.
+- Il punto Fondazioni “GitHub Releases per APK debug” resta `[~]` fino a una Release reale verificata con APK allegato e certificato persistente corretto.
 
 ### 2026-09-02 — M4.5 chiusa sul branch, in attesa di conferma
 - M4.5 implementata sul branch `m4-cache-sync` sopra il checkpoint M4.4 confermato; nessuna integrazione su `main` è stata eseguita e M4 complessiva resta `[~] in corso`.
@@ -547,10 +570,10 @@ Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa p
 ### 2026-09-01 — M2 completata
 - Completato lo scheletro Android nativo Kotlin + Jetpack Compose + Material 3 con `applicationId` `com.archimede.w2full` e tema Petrol Night.
 - Integrata l'Adaptive Icon derivata dal master M1 e aggiunto il test JVM minimo.
-- Pipeline Android CI verificata con build reale, `apksigner` e artifact APK.
+- Pipeline Android CI verificata con build reale, `apksigner` e artifact APK interno; la distribuzione installabile viene successivamente standardizzata sulle GitHub Releases taggate.
 - Configurato e verificato il keystore debug persistente tramite i quattro GitHub Actions Secrets, senza chiavi nel repository.
 - Run indipendenti `33501937187` e `33502077657` riusciti su runner distinti con identico certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
-- Artifact `w2full-debug-apk` prodotti correttamente; M2 chiusa senza avviare M3.
+- Artifact `w2full-debug-apk` prodotti correttamente come evidenza tecnica; M2 chiusa senza avviare M3.
 
 ### 2026-09-01 — M2: secrets configurati, verifica firma avviata
 - Registrata la configurazione dei quattro GitHub Actions Secrets per il keystore debug persistente.
@@ -609,7 +632,6 @@ Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa p
 
 ## 11. Decisioni aperte
 
-- versionamento/naming GitHub Releases e trigger Release;
 - raggio massimo stazioni;
 - retention storico prezzi;
 - libreria grafici definitiva in M5;
