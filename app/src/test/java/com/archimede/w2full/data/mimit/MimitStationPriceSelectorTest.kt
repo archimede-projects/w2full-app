@@ -37,9 +37,9 @@ class MimitStationPriceSelectorTest {
             MimitStationPriceSelector.select(prices, "Benzina").pricesByStationId[10],
         )
 
-        assertEquals(1_759, selected.self?.priceMilliEuroPerUnit)
+        assertEquals(1_759L, selected.self?.priceMilliEuroPerUnit)
         assertEquals(LocalDateTime.parse("2026-09-02T08:00:00"), selected.self?.communicatedAt)
-        assertEquals(1_899, selected.served?.priceMilliEuroPerUnit)
+        assertEquals(1_899L, selected.served?.priceMilliEuroPerUnit)
         assertEquals(LocalDateTime.parse("2026-09-02T09:00:00"), selected.served?.communicatedAt)
     }
 
@@ -54,7 +54,7 @@ class MimitStationPriceSelectorTest {
             MimitStationPriceSelector.select(prices, "Gasolio").pricesByStationId[20],
         )
 
-        assertEquals(1_650, selected.self?.priceMilliEuroPerUnit)
+        assertEquals(1_650L, selected.self?.priceMilliEuroPerUnit)
         assertNull(selected.served)
     }
 

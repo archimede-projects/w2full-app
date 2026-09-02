@@ -129,8 +129,8 @@ class NearbyStationsRepositoryTest {
         val selected = requireNotNull(snapshot.pricesByStationId[999])
 
         assertEquals("GASOLIO", snapshot.selectedFuelType)
-        assertEquals(1_650, selected.self?.priceMilliEuroPerUnit)
-        assertEquals(1_799, selected.served?.priceMilliEuroPerUnit)
+        assertEquals(1_650L, selected.self?.priceMilliEuroPerUnit)
+        assertEquals(1_799L, selected.served?.priceMilliEuroPerUnit)
         assertEquals(MimitPriceUnit.LITER, selected.unit)
     }
 
@@ -140,7 +140,7 @@ class NearbyStationsRepositoryTest {
         val fallback = requireNotNull(repository().loadCachedSnapshot())
 
         assertEquals(MimitStationPriceSelector.FALLBACK_FUEL_TYPE, fallback.selectedFuelType)
-        assertEquals(1_700, fallback.pricesByStationId[999]?.self?.priceMilliEuroPerUnit)
+        assertEquals(1_700L, fallback.pricesByStationId[999]?.self?.priceMilliEuroPerUnit)
 
         database.mimitCacheDao().clearPrices()
         database.mimitCacheDao().insertPrices(

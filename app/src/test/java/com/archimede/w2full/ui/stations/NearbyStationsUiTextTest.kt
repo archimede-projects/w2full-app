@@ -125,7 +125,7 @@ class NearbyStationsUiTextTest {
 
         assertEquals(listOf(1L), state.stations.map { it.station.id })
         assertEquals(timestamp, state.lastSuccessfulUpdateEpochMillis)
-        assertEquals(1_759, state.pricesByStationId[1]?.self?.priceMilliEuroPerUnit)
+        assertEquals(1_759L, state.pricesByStationId[1]?.self?.priceMilliEuroPerUnit)
         assertEquals(MIMIT_REFRESH_ERROR_MESSAGE, errorMessage)
         assertFalse(errorMessage.contains("Exception", ignoreCase = true))
         assertFalse(errorMessage.contains("header", ignoreCase = true))
