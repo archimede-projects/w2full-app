@@ -35,9 +35,12 @@ jobs:
           echo "Created $TAG at $GITHUB_SHA"
 
   publish-preview:
-    if: ${{ github.event.head_commit.message == 'chore(release): bootstrap v0.4.5-preview' }}
     needs: create-preview-tag
-    uses: ./.github/workflows/android-release.yml
+    uses: archimede-projects/w2full-app/.github/workflows/android-release.yml@release-distribution
     with:
       release_tag: v0.4.5-preview
-    secrets: inherit
+    secrets:
+      W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
+      W2FULL_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEYSTORE_PASSWORD }}
+      W2FULL_DEBUG_KEY_ALIAS: ${{ secrets.W2FULL_DEBUG_KEY_ALIAS }}
+      W2FULL_DEBUG_KEY_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEY_PASSWORD }}
