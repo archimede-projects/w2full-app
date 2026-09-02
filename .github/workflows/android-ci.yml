@@ -11,6 +11,7 @@ on:
       - m4-location-distance
       - m4-nearby-stations-ui
       - m4-cache-sync
+      - hotfix-device-validation
   workflow_dispatch:
 
 permissions:
