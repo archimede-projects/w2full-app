@@ -12,6 +12,7 @@ on:
       - m4-nearby-stations-ui
       - m4-cache-sync
       - hotfix-device-validation
+      - m4-vehicle-fuel-setting
   workflow_dispatch:
 
 permissions:
