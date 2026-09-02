@@ -104,7 +104,7 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - [x] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
 - [ ] Import locale impianti/prezzi.
 - [x] Filtro bandiera Eni.
-- [ ] Posizione utente + Haversine.
+- [~] Posizione utente + Haversine.
 - [ ] UI stazioni vicine.
 - [ ] Refresh manuale + WorkManager giornaliero.
 
@@ -268,7 +268,19 @@ Decisioni tecniche M4.2 — filtro bandiera Eni:
 - il filtro preserva l'ordine originale dei record e, quando applicato a `MimitDataset<MimitStation>`, preserva anche `extractionDate`;
 - test dedicati devono coprire `Eni`, varianti di maiuscole/minuscole e spazi, insieme a non-match come `Q8`, `Pompe Bianche`, stringa vuota e valori contenenti ma non uguali a `Eni`.
 
-Verifica M4.2 sul branch `m4-eni-filter`: commit applicativo `997b9ccca6b1be962751fdb3b8ece048983438b4`; run GitHub Actions `33596403891`, job `100140620391`, tutti gli step obbligatori `success`; `testDebugUnitTest` e `assembleDebug` entrambi `BUILD SUCCESSFUL`; artifact `w2full-debug-apk` ID `9833570963`, dimensione `13219188` byte, digest ZIP `sha256:8963c06b15cf9b97b1606e2d9dbde50aeb816c424e9bc4ffd75378cdc1bd5549`; firma APK v2 con un signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico a M2/M3/M4.1.
+Verifica M4.2 sul branch `m4-eni-filter`: commit applicativo `997b9ccca6b1be962751fdb3b8ece048983438b4`; run GitHub Actions `33596403891`, job `100140620391`, tutti gli step obbligatori `success`; `testDebugUnitTest` e `assembleDebug` entrambi `BUILD SUCCESSFUL`; artifact `w2full-debug-apk` ID `9833570963`, dimensione `13219188` byte, digest ZIP `sha256:8963c06b15cf9b97b1606e2d9dbde50aeb816c424e9bc4ffd75378cdc1bd5549`; firma APK v2 con un signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico a M2/M3/M4.1. Il checkpoint M4.2 è stato confermato dall'utente il **2 settembre 2026** dopo verifica anche del confronto esatto della bandiera `eni`.
+
+Decisioni tecniche M4.3 — posizione utente e distanza:
+- dipendenza Google Play services Location `21.4.0`, versione stabile corrente verificata sulla documentazione ufficiale il 2 settembre 2026; accesso tramite `FusedLocationProviderClient`, senza introdurre servizi a pagamento o backend;
+- il manifest dichiara `ACCESS_COARSE_LOCATION` e `ACCESS_FINE_LOCATION`; M4.3 non introduce ancora UI né dialog di richiesta permesso: il flusso di richiesta esplicita resta a M4.4, mentre il provider M4.3 deve funzionare correttamente quando uno dei due permessi è già concesso;
+- il provider restituisce un risultato tipizzato: `Available(GeoPoint)`, `PermissionDenied` oppure `Unavailable`; permesso negato/revocato, location `null`, Google Play services non disponibile o errore del provider non devono causare crash;
+- la posizione viene richiesta con `FusedLocationProviderClient.getCurrentLocation` a priorità bilanciata; la cancellazione coroutine deve cancellare anche la richiesta sottostante e non viene trasformata in errore applicativo;
+- `GeoPoint` valida coordinate finite con latitudine `[-90, 90]` e longitudine `[-180, 180]`;
+- distanza geodetica calcolata con Haversine usando raggio terrestre medio `6371.0088 km`: `a = sin²(Δφ/2) + cos φ1 * cos φ2 * sin²(Δλ/2)`, `c = 2 * atan2(√a, √(1-a))`, `distanceKm = R * c`;
+- il ranking opera sulle sole stazioni Eni ottenute tramite `MimitStationFilter`; con posizione disponibile, stazioni con coordinate valide sono ordinate per distanza crescente, poi deterministicamente per nome/comune/indirizzo/id; stazioni con coordinate mancanti o invalide hanno `distanceKm = null` e vengono poste dopo quelle localizzabili;
+- senza posizione (`PermissionDenied` o `Unavailable`) nessuna distanza viene inventata: tutte le distanze restano `null` e le stazioni Eni vengono ordinate deterministicamente in modo alfabetico per nome (con fallback indirizzo/comune/id);
+- il livello di servizio M4.3 deve intercettare errori non di cancellazione provenienti dal provider e degradare a `Unavailable`, così un problema di localizzazione non interrompe l'app;
+- test JVM obbligatori: Haversine stesso punto/rotta nota/simmetria; coordinate station mancanti/invalide; ranking per distanza; tie/fallback alfabetico; permesso negato; posizione non disponibile; provider che fallisce; esclusione delle stazioni non Eni.
 
 Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 - ogni refresh è **atomico**: i dati cached vengono sostituiti soltanto dopo download, parsing, validazione e preparazione dell'intero aggiornamento completati con successo; un fallimento parziale non deve mai cancellare o corrompere l'ultima cache valida;
@@ -281,8 +293,8 @@ Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 
 Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
 1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. **[x] checkpoint confermato**.
-2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] implementato e CI branch verde; in attesa di conferma utente**.
-3. **M4.3 — posizione e distanza**: permessi minimali, posizione utente e Haversine, con test della formula indipendenti dalla posizione reale.
+2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] checkpoint confermato**.
+3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[~] autorizzato**.
 4. **M4.4 — UI stazioni vicine**: stato ViewModel/Repository e schermata Compose; nessun ampliamento a storico/notifiche.
 5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra.
 
@@ -301,6 +313,15 @@ Deliverable M4.2:
 - [x] test JVM positivi/negativi e casi di normalizzazione;
 - [x] CI reale sul branch M4.2 con test, APK e firma persistente verdi;
 - [x] nessuna modifica a cache/persistenza/UI/posizione.
+
+Deliverable M4.3:
+- [ ] `GeoPoint` + Haversine puro e validato;
+- [ ] provider `FusedLocationProviderClient` con esiti `Available` / `PermissionDenied` / `Unavailable` e nessun crash su errore;
+- [ ] ranking delle sole stazioni Eni per distanza, con coordinate mancanti/invalide gestite come distanza non disponibile;
+- [ ] fallback alfabetico deterministico quando la posizione non è disponibile o il permesso è negato;
+- [ ] test JVM dei calcoli, ranking e fallback senza dipendenza da posizione reale;
+- [ ] CI reale sul branch M4.3 con test, APK e firma persistente verdi;
+- [ ] nessuna modifica a UI, cache/Room, import o WorkManager.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -384,6 +405,12 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.2 confermata, M4.3 avviata
+- M4.2 confermata dall'utente dopo verifica del codice reale e del confronto esatto `eni`.
+- M4.3 autorizzata con scope stretto: posizione utente, Haversine e ordinamento delle sole stazioni Eni; UI, cache/persistenza, import e WorkManager restano esclusi.
+- Scelto Google Play services Location 21.4.0; provider resiliente con stati `Available`, `PermissionDenied`, `Unavailable`.
+- In assenza di posizione non viene inventata alcuna distanza: fallback alfabetico deterministico e nessun crash.
 
 ### 2026-09-02 — M4.2 implementata e verificata sul branch
 - Aggiunto `MimitStationFilter` come filtro puro dei `MimitStation` già parsati da M4.1: match esatto della bandiera normalizzata `Eni`, preservazione ordine e `extractionDate`, nessuna dipendenza da rete/cache/UI/posizione.
@@ -486,8 +513,7 @@ Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa p
 ## 11. Decisioni aperte
 
 - versionamento/naming GitHub Releases e trigger Release;
-- raggio e ordinamento stazioni;
-- permessi posizione minimali;
+- raggio massimo stazioni;
 - retention storico prezzi;
 - libreria grafici definitiva in M5;
 - schema CSV in M7;
