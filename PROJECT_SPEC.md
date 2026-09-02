@@ -27,13 +27,13 @@ W2Full è un'app Android nativa, gratuita e locale per un singolo veicolo V1: re
 - M1 — design: **[x]**
 - M2 — scaffold Android/CI/firma: **[x]**
 - M3 — registro rifornimenti/calcoli: **[x]**
-- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5 confermate sui rispettivi branch, non integrate su `main`**
+- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5 e hotfix device/prices verificati, non integrati su `main`**
 - M5 — storico prezzi + grafico: **[ ]**
 - M6 — notifiche soglia: **[ ]**
 - M7 — rifiniture: **[ ]**
 - Checkpoint distribuzione GitHub Releases: **[~] in corso**; Release reali già verificate, cleanup infrastrutturale permanente ancora separato dall'integrazione M4.
 
-`main` deve restare invariato durante il presente hotfix. Prima di ogni dichiarazione di chiusura va ricontrollato lo stato reale del repository.
+`main` deve restare invariato durante i substep M4. Prima di ogni dichiarazione di chiusura va ricontrollato lo stato reale del repository.
 
 ## 4. Contratto MIMIT corrente
 
@@ -45,93 +45,86 @@ Metadato corrente già verificato: `Metadati_prezzi_carburanti_20260128.pdf`, in
 
 ### Correzioni post-preview già implementate e verificate realmente
 
-La prima Release `v0.4.5-preview` ha mostrato sul Galaxy S25 due blocchi non emersi dalle fixture CI. Diagnosi e correzioni già applicate sul branch `hotfix-device-validation`:
+La prima Release `v0.4.5-preview` ha mostrato sul Galaxy S25 due blocchi non emersi dalle fixture CI. Diagnosi e correzioni applicate sul branch `hotfix-device-validation`:
 
 1. **Artefatto CSV anagrafica reale.** Il dataset 2026-09-01 contiene 112 record con `| gestori.prezzibenzina.it` non quotato dentro un campo testuale; il parser ricompone esclusivamente questo pattern noto e continua a rifiutare ogni altra sovrannumerazione di colonne.
 2. **Bandiera Eni reale.** Whitelist esatta dopo trim/compressione spazi/case-folding `Locale.ROOT`: `eni` e `agip eni`; vietato `contains`.
-3. **Posizione indipendente dalla cache.** Lo stato posizione deve risolversi anche con cache vuota o refresh MIMIT fallito; `Verifica della posizione in corso` rappresenta solo una richiesta realmente pendente.
+3. **Posizione indipendente dalla cache.** Lo stato posizione si risolve anche con cache vuota o refresh MIMIT fallito; `Verifica della posizione in corso` rappresenta solo una richiesta realmente pendente.
 4. **Timeout Fused Location.** `getCurrentLocation()` ha timeout applicativo di 12 secondi; allo scadere cancella la richiesta sottostante e degrada a `Unavailable`; la cancellazione esterna della coroutine continua a propagarsi.
 5. **Resilienza M4.5 invariata.** Refresh atomico, cache/timestamp precedenti preservati su failure, logger tecnico `W2Full-MIMIT`, messaggio utente generico e stessa semantica manuale/worker.
 
-La Release `v0.4.5-preview.2` è stata verificata realmente dall'utente il **2 settembre 2026** sul Galaxy S25: refresh MIMIT riuscito, `Agip Eni` visibili, timestamp ultimo aggiornamento valorizzato, posizione non più bloccata indefinitamente e ranking per distanza funzionante. Questi quattro fix restano parte obbligatoria del lignaggio corrente.
+La Release `v0.4.5-preview.2` è stata verificata realmente dall'utente il **2 settembre 2026** sul Galaxy S25: refresh MIMIT riuscito, `Agip Eni` visibili, timestamp ultimo aggiornamento valorizzato, posizione non più bloccata indefinitamente e ranking per distanza funzionante.
 
-## 5. Hotfix corrente — prezzi nelle card Stazioni
+## 5. Hotfix prezzi nelle card Stazioni
 
-Stato: **[~] autorizzato e da implementare sul solo branch `hotfix-device-validation`**. Issue di tracciamento: `#2 M4 hotfix: mostrare prezzi carburante nelle card stazione`.
-
-La verifica reale di `v0.4.5-preview.2` ha confermato che i prezzi vengono scaricati e persistiti in `mimit_prices`, ma la UI espone soltanto nome, indirizzo e distanza. Prima di qualunque integrazione M4 questa lacuna va chiusa con il seguente contratto vincolante.
+Stato: **[x] implementato, CI verificato e confermato su Galaxy S25**. Issue di tracciamento: `#2 M4 hotfix: mostrare prezzi carburante nelle card stazione`.
 
 ### 5.1 Carburante selezionato
 
 - Ogni snapshot/lista Stazioni usa il `defaultFuelType` del veicolo singleton V1 (`vehicleId = 1`).
 - Se il veicolo non è ancora disponibile o il valore è blank, fallback deterministico `Benzina`.
-- Il confronto tra `defaultFuelType` e `MIMIT descCarburante/fuelDescription` applica trim, compressione degli spazi interni e confronto case-insensitive via `Locale.ROOT`, ma resta **semanticamente esatto**: niente `contains`, prefissi o suffissi permissivi.
+- Il confronto tra `defaultFuelType` e `MIMIT descCarburante/fuelDescription` applica trim, compressione degli spazi interni e confronto case-insensitive via `Locale.ROOT`, ma resta semanticamente esatto: niente `contains`, prefissi o suffissi permissivi.
 
 ### 5.2 Selezione del prezzo
 
 - Nessun nuovo download e nessuna nuova tabella: usare esclusivamente i `mimit_prices` già appartenenti allo snapshot atomico M4.5.
 - Per ciascuna stazione, carburante selezionato e modalità (`isSelf = true/false`), scegliere la comunicazione MIMIT con `communicatedAt` più recente.
 - Se sono disponibili entrambe le modalità, mostrarle entrambe come `Self` e `Servito`; se ne esiste una sola, mostrare solo quella.
-- Il prezzo persistito in millesimi di euro deve essere mostrato con **tre cifre decimali**.
+- Il prezzo persistito in millesimi di euro è mostrato con tre cifre decimali.
 - Unità: carburante normalizzato esattamente `Metano` → `€/kg`; tutti gli altri carburanti correnti → `€/L`.
 - Se la stazione non possiede alcuna riga compatibile col carburante del veicolo, mostrare `Prezzo non disponibile`; non sostituire con il prezzo di un carburante diverso.
 - La selezione prezzi è presentazione dello snapshot corrente e non anticipa lo storico M5.
 
 ### 5.3 UI
 
-Ogni card stazione mantiene nome, indirizzo/comune/provincia e distanza. Aggiunge il carburante selezionato e, quando presenti, i prezzi, per esempio:
+Ogni card stazione mantiene nome, indirizzo/comune/provincia e distanza e aggiunge carburante selezionato e prezzi, per esempio:
 
 `Benzina`
 `Self 1,759 €/L · Servito 1,899 €/L`
 
-oppure, senza righe compatibili:
+oppure:
 
 `Benzina`
 `Prezzo non disponibile`
 
-La UI non deve esporre timestamp tecnici per singola riga prezzo in questa preview; l'ultimo aggiornamento complessivo M4.5 resta visibile come già implementato.
+### 5.4 Evidenze automatiche e Release
 
-### 5.4 Test obbligatori offline
+- Implementazione: `96753c425572004584d24cafcc48de71dead44a4`.
+- Correzione test tipologica: `b86b202c4704b925ebca6a316d29110914ce99a2`.
+- CI branch finale prima della Release: run `33649350040`, job `100312085667`, **SUCCESS**.
+- Test JVM: **SUCCESS**; `assembleDebug`: **SUCCESS**.
+- Firma persistente v2 verificata con certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
+- Release `v0.4.5-preview.3` pubblicata dal commit `904dba42c7d7838aecc6c27a9aea6a580c44fc80`.
+- Run Release `33649683672`; job `100313300180`: **SUCCESS**.
+- Asset `w2full-v0.4.5-preview.3-debug.apk`, SHA-256 `6a9293db29a3f83b1752d62604ff9a92ef73ad55d5838c9dc54435bfa3daf881`.
 
-Prima della Release devono risultare verdi almeno questi regression test, senza rete/GPS pubblici:
+### 5.5 Verifica reale Galaxy S25
 
-- normalizzazione esatta del carburante (case/whitespace sì; sottostringhe no);
-- Self + Servito della stessa stazione entrambi selezionati;
-- sola modalità presente;
-- più comunicazioni della stessa modalità → selezione della `communicatedAt` più recente;
-- righe di carburante diverso ignorate;
-- `Metano` → `€/kg` e formattazione a tre decimali;
-- nessuna riga compatibile → `Prezzo non disponibile`;
-- snapshot/repository usa realmente `VehicleEntity.defaultFuelType`, con fallback `Benzina` quando veicolo/valore non disponibile;
-- tutti i test di resilienza/atomicità/cache/location già esistenti continuano a passare.
+Confermata dall'utente il **2 settembre 2026** su `v0.4.5-preview.3`:
+- posizione disponibile e lista ordinata per distanza;
+- refresh MIMIT riuscito;
+- carburante `Benzina` mostrato nelle card;
+- Self e Servito distinti;
+- prezzi a tre decimali con `€/L`;
+- fallback `Prezzo non disponibile` osservato su una stazione senza prezzo Benzina compatibile;
+- distanza e indirizzo restano visibili.
 
-### 5.5 Versione e verifica
-
-La nuova preview installabile usa:
-- `versionCode 4`;
-- `versionName 0.3.1-m4-hotfix`;
-- tag previsto `v0.4.5-preview.3`;
-- stessa identità di firma persistente delle preview precedenti.
-
-Sequenza obbligatoria: questa spec → codice/test → CI reale branch con `testDebugUnitTest`, `assembleDebug`, `apksigner` e certificato atteso → GitHub Release `v0.4.5-preview.3` → verifica reale Galaxy S25. L'hotfix non viene dichiarato chiuso prima della conferma dell'utente.
+L'hotfix prezzi è quindi chiuso. La possibilità di modificare `defaultFuelType` dall'interfaccia è un substep separato e non viene retroattivamente incluso in questo hotfix.
 
 ## 6. Requisito UX futuro già approvato — Indicazioni
 
-Stato: **[ ] pianificato per M7, non incluso nell'hotfix prezzi corrente**. Issue di tracciamento: `#1 UX: pulsante Indicazioni verso la stazione`.
+Stato: **[ ] pianificato per M7**. Issue di tracciamento: `#1 UX: pulsante Indicazioni verso la stazione`.
 
-Per non perdere la richiesta emersa durante il test reale:
 - ogni card stazione dovrà offrire un pulsante **`Indicazioni`**;
 - il pulsante apre Google Maps o un gestore mappe compatibile tramite intent, impostando la stazione come destinazione e lasciando all'app mappe la partenza dalla posizione attuale dell'utente;
 - usare preferibilmente coordinate MIMIT valide, con fallback all'indirizzo quando opportuno;
 - nessuna mappa embedded in W2Full e nessun SDK Maps a pagamento richiesto.
 
-Questo requisito resta esplicitamente fuori dalla preview.3 per mantenere un solo obiettivo applicativo alla volta.
-
 ## 7. Distribuzione APK
 
 Il workflow permanente `.github/workflows/android-release.yml` deve creare Release esclusivamente da tag `v*`, ripetendo test/build e verifica firma sul commit taggato. I quattro secret del keystore sono obbligatori; nessun fallback a firma effimera è ammesso nel workflow Release. L'asset usa `w2full-<tag>-debug.apk`; le Release preview/rc sono prerelease.
 
-Il bootstrap temporaneo usato per creare le prime preview resta debito infrastrutturale isolato e deve essere rimosso nel checkpoint distribuzione; non va confuso con la chiusura del presente hotfix né con l'integrazione M4.
+Il bootstrap temporaneo usato per creare le prime preview resta debito infrastrutturale isolato e deve essere rimosso nel checkpoint distribuzione; non va confuso con la chiusura degli hotfix M4 né con l'integrazione M4.
 
 ## 8. Decisioni aperte
 
@@ -142,9 +135,10 @@ Il bootstrap temporaneo usato per creare le prime preview resta debito infrastru
 
 ## 9. Changelog corrente
 
-### 2026-09-02 — preview.2 verificata, prezzi Stazioni autorizzati
-- Verificata sul Galaxy S25 `v0.4.5-preview.2`: import reale, alias `Agip Eni`, ultimo aggiornamento e ranking posizione funzionanti.
-- Confermato che l'assenza di una visualizzazione della posizione non è un bug del provider; la posizione viene già usata per il ranking.
-- Rilevata e autorizzata la lacuna UI prezzi: usare carburante del veicolo, ultimo prezzo per Self/Servito e unità corretta; prevista `v0.4.5-preview.3`.
-- Registrato per M7 il requisito `Indicazioni` verso la stazione, tracciato anche con issue #1.
+### 2026-09-02 — preview.3 verificata, hotfix prezzi chiuso
+- Verificata sul Galaxy S25 `v0.4.5-preview.3`: posizione, ranking, prezzi Benzina Self/Servito, tre decimali, unità e fallback senza prezzo funzionanti.
+- Hotfix prezzi dichiarato chiuso; issue #2 può essere chiusa come completata.
+- Confermato che `defaultFuelType` è già persistito e consumato dalla schermata Stazioni, ma non è ancora modificabile dall'UI.
+- Autorizzato un substep M4 separato per aggiungere la configurazione del carburante del veicolo.
+- Requisito M7 `Indicazioni` resta tracciato separatamente.
 - `main` resta invariato; nessuna integrazione M4 autorizzata in questo passaggio.
