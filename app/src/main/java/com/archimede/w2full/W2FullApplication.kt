@@ -9,6 +9,8 @@ import com.archimede.w2full.data.mimit.MimitCsvClient
 import com.archimede.w2full.data.mimit.NearbyStationsRepository
 import com.archimede.w2full.data.mimit.RoomNearbyStationsRepository
 import com.archimede.w2full.data.repository.RefuelingRepository
+import com.archimede.w2full.data.repository.RoomVehicleSettingsRepository
+import com.archimede.w2full.data.repository.VehicleSettingsRepository
 import com.archimede.w2full.location.FusedUserLocationProvider
 import com.archimede.w2full.sync.MimitSyncScheduler
 
@@ -32,6 +34,13 @@ class W2FullApplication : Application() {
                 userLocationProvider = FusedUserLocationProvider(this),
             ),
             logger = LogcatMimitLogger(),
+        )
+    }
+
+    val vehicleSettingsRepository: VehicleSettingsRepository by lazy {
+        RoomVehicleSettingsRepository(
+            vehicleDao = database.vehicleDao(),
+            cacheDao = database.mimitCacheDao(),
         )
     }
 

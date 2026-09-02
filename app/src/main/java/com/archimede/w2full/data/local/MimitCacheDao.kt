@@ -14,6 +14,9 @@ interface MimitCacheDao {
     @Query("SELECT * FROM mimit_prices ORDER BY station_id, fuel_description, is_self, communicated_at")
     fun observePrices(): Flow<List<MimitPriceEntity>>
 
+    @Query("SELECT DISTINCT fuel_description FROM mimit_prices ORDER BY fuel_description COLLATE NOCASE")
+    fun observeFuelDescriptions(): Flow<List<String>>
+
     @Query("SELECT * FROM mimit_sync_state WHERE id = 1 LIMIT 1")
     fun observeSyncState(): Flow<MimitSyncStateEntity?>
 

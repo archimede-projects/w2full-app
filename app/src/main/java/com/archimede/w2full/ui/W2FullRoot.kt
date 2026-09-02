@@ -15,10 +15,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.archimede.w2full.ui.refueling.RefuelingRoute
 import com.archimede.w2full.ui.stations.NearbyStationsRoute
+import com.archimede.w2full.ui.vehicle.VehicleSettingsRoute
 
 private enum class RootDestination {
     REFUELING,
     STATIONS,
+    VEHICLE,
 }
 
 @Composable
@@ -40,6 +42,12 @@ fun W2FullRoot() {
                     icon = { Text("S") },
                     label = { Text("Stazioni") },
                 )
+                NavigationBarItem(
+                    selected = destination == RootDestination.VEHICLE,
+                    onClick = { destination = RootDestination.VEHICLE },
+                    icon = { Text("V") },
+                    label = { Text("Veicolo") },
+                )
             }
         },
     ) { innerPadding ->
@@ -51,6 +59,7 @@ fun W2FullRoot() {
             when (destination) {
                 RootDestination.REFUELING -> RefuelingRoute()
                 RootDestination.STATIONS -> NearbyStationsRoute()
+                RootDestination.VEHICLE -> VehicleSettingsRoute()
             }
         }
     }

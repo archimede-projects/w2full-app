@@ -14,8 +14,8 @@ android {
         applicationId = "com.archimede.w2full"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.3.1-m4-hotfix"
+        versionCode = 5
+        versionName = "0.3.2-m4-fuel-setting"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
