@@ -102,11 +102,11 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 
 ### Dati MIMIT
 - [x] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
-- [ ] Import locale impianti/prezzi.
+- [~] Import locale impianti/prezzi.
 - [x] Filtro bandiera Eni.
 - [x] Posizione utente + Haversine.
 - [x] UI stazioni vicine.
-- [ ] Refresh manuale + WorkManager giornaliero.
+- [~] Refresh manuale + WorkManager giornaliero.
 
 ### Storico/notifiche/rifiniture
 - [ ] Storico prezzi + grafico.
@@ -300,21 +300,39 @@ Decisioni tecniche M4.4 — UI stazioni vicine:
 
 Verifica M4.4 sul branch `m4-nearby-stations-ui`: HEAD applicativo/CI `66acaf957c15782b0251d2ab2455788dcb56a5a0`; run GitHub Actions `33601057414`, job `100154609063`, tutti gli step obbligatori `success`; `testDebugUnitTest` = `BUILD SUCCESSFUL in 57s`, `assembleDebug` = `BUILD SUCCESSFUL in 29s`; artifact `w2full-debug-apk` ID `9835232992`, dimensione `13847203` byte, digest ZIP `sha256:e55e6d03e7c4ac5df84404d49811f739e922455abfbfe19bcb7232e0219246c4`; firma APK v2 con un signer e certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, identico alle milestone precedenti. Il primo run M4.4 `33600888882` aveva correttamente bloccato il checkpoint in compilazione per l'uso dell'import Compose `weight`; il fix `66acaf957c15782b0251d2ab2455788dcb56a5a0` ha eliminato tale API e la CI successiva è interamente verde. Nessun dato MIMIT è persistito in M4.4.
 
+Il checkpoint M4.4 è stato confermato dall'utente il **2 settembre 2026** dopo verifica del codice reale, inclusa la navigazione locale `Registro` / `Stazioni` senza libreria Navigation e la gestione trasparente del primo run fallito/corretto.
+
+Decisioni tecniche M4.5 — cache/import/sync resiliente:
+- Room passa da schema `1` a schema `2` con migrazione esplicita `MIGRATION_1_2`; la migrazione crea soltanto le nuove tabelle MIMIT e non ricrea né modifica `vehicles` o `refuel_entries`, così i dati M3 devono restare integralmente preservati;
+- nuove tabelle cache: `mimit_stations` per le stazioni Eni filtrate, `mimit_prices` per le sole righe prezzo riferite agli ID Eni cached, e singleton `mimit_sync_state` (`id = 1`) con date estrazione anagrafica/prezzi e `last_successful_update_epoch_millis`;
+- la cache M4.5 è uno snapshot locale dell'ultimo import valido, non lo storico prezzi M5: `mimit_prices` rappresenta il CSV corrente associato alle stazioni Eni, mentre la retention storica resta una decisione separata di M5;
+- ogni refresh usa la stessa pipeline per UI manuale e background: download anagrafica → parsing → filtro Eni → download prezzi → parsing → filtro prezzi per ID Eni → validazione completa → preparazione entità → singola transazione Room di sostituzione;
+- prima di aprire la transazione devono essere completati entrambi i download e parsing. La validazione rifiuta dataset anagrafica/prezzi vuoti, insieme Eni vuoto, prezzi Eni vuoti e ID stazione Eni duplicati; un input non valido è trattato come failure e non tocca la cache precedente;
+- la sostituzione è atomica con `withTransaction`: delete delle sole tabelle cache MIMIT, insert del nuovo snapshot e upsert di `mimit_sync_state` avvengono nella stessa transazione. `lastSuccessfulUpdateEpochMillis` viene scritto come ultimo stato logico del commit e solo dopo che l'intero snapshot è pronto;
+- qualunque errore di rete/HTTP, `MimitCsvFormatException`, header cambiato, parsing, validazione o persistenza viene intercettato al confine repository; `CancellationException` resta propagata. Su failure non viene eseguita alcuna sostituzione e cache/timestamp precedenti restano invariati;
+- il repository restituisce un outcome tipizzato `Success` / `Failure`; il dettaglio tecnico dell'errore viene inviato a un logger iniettabile. In produzione il logger usa `android.util.Log` con tag fisso `W2Full-MIMIT`, messaggio tecnico e throwable/stack trace; la UI riceve soltanto il messaggio generico `Impossibile aggiornare i prezzi al momento`;
+- la UI osserva la cache Room: dati cached già validi restano visibili durante un refresh e dopo un refresh fallito. Senza cache valida viene mostrato uno stato vuoto/errore comprensibile, senza crash;
+- `lastSuccessfulUpdateEpochMillis` viene esposto alla UI dalla cache Room. Quando presente, la schermata mostra sempre età relativa più timestamp assoluto locale: meno di 60 minuti → `Aggiornato pochi minuti fa`; da 1 a 23 ore → `Aggiornato X ore fa`; da 24 ore in poi → `Aggiornato X giorni fa`; seguito da data/ora assoluta `dd/MM/yyyy HH:mm`. Se non esiste ancora alcun import valido resta il placeholder `Ultimo aggiornamento: non ancora disponibile`;
+- il pulsante `Aggiorna` della schermata invoca lo stesso `refresh()` atomico usato dal worker; non esiste un percorso manuale che scriva direttamente la cache;
+- WorkManager `2.11.2`: `CoroutineWorker` dedicato e unique periodic work giornaliero con `NetworkType.CONNECTED`, policy `KEEP`; il worker usa lo stesso repository `refresh()`. Un errore handled non cancella né svuota la cache; gli errori di rete possono richiedere retry con backoff, mentre errori di formato restano diagnosticati e verranno ritentati al ciclo periodico successivo;
+- lo scheduling periodico viene inizializzato dall'Application senza richiedere permessi di posizione/background location; la posizione resta foreground M4.3/M4.4 e il worker importa/cache-a soltanto i dataset MIMIT;
+- tutti i test di rete continuano a usare MockWebServer/fixture locali: nessuna richiesta MIMIT reale in CI.
+
 Requisiti vincolanti M4.5 — resilienza import/cache/sync:
 - ogni refresh è **atomico**: i dati cached vengono sostituiti soltanto dopo download, parsing, validazione e preparazione dell'intero aggiornamento completati con successo; un fallimento parziale non deve mai cancellare o corrompere l'ultima cache valida;
 - errori HTTP/rete, `MimitCsvFormatException`, colonne mancanti/impreviste o qualunque formato MIMIT inatteso devono essere intercettati al confine Repository/sync: l'app non deve crashare e deve continuare a usare gli ultimi dati validi disponibili;
-- in caso di errore con cache esistente, la UI mostra un messaggio non bloccante e non tecnico, ad esempio `Impossibile aggiornare i prezzi al momento`, continuando a visualizzare i dati cached; senza cache valida viene mostrato uno stato vuoto/errore comprensibile, sempre senza crash;
+- in caso di errore con cache esistente, la UI mostra un messaggio non bloccante e non tecnico, `Impossibile aggiornare i prezzi al momento`, continuando a visualizzare i dati cached; senza cache valida viene mostrato uno stato vuoto/errore comprensibile, sempre senza crash;
 - la persistenza include `lastSuccessfulUpdateEpochMillis`, aggiornato **solo** dopo un import completamente riuscito; un tentativo fallito non modifica questo timestamp;
-- la UI stazioni mostra sempre l'età dell'ultimo aggiornamento riuscito quando esiste una cache, ad esempio `Aggiornato 3 giorni fa`, derivandola da `lastSuccessfulUpdateEpochMillis`; il timestamp assoluto resta disponibile al modello per eventuale dettaglio data/ora;
+- la UI stazioni mostra sempre l'età dell'ultimo aggiornamento riuscito quando esiste una cache e rende disponibile anche data/ora assoluta;
 - l'errore tecnico specifico viene registrato localmente in Logcat con tag `W2Full-MIMIT`, includendo exception/stack trace quando disponibile, ma dettagli tecnici e stack trace non vengono esposti all'utente;
-- test M4.5 obbligatori: refresh valido aggiorna cache e timestamp; parsing/header invalido preserva cache e timestamp; HTTP fallito preserva cache e timestamp; dati cached restano disponibili dopo errore; UI espone l'età dell'ultimo successo; errore specifico raggiunge il logger senza finire nel messaggio utente.
+- test M4.5 obbligatori: CSV valido → cache aggiornata; header cambiato → errore intercettato; parse fallito → cache invariata; download fallito → cache invariata; refresh fallito → timestamp invariato; refresh riuscito → timestamp aggiornato; dati cached + errore → UI continua a mostrare i dati; UI espone sempre l'età dell'ultimo aggiornamento quando il timestamp esiste; errore tecnico raggiunge il logger ma non il messaggio utente; migrazione Room 1→2 preserva i dati M3; worker/manual refresh condividono la stessa semantica repository.
 
 Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazione:
 1. **M4.1 — download/parsing CSV**: OkHttp, parser dei due formati, DTO MIMIT, fixture statiche e test JVM/MockWebServer. **[x] checkpoint confermato**.
 2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] checkpoint confermato**.
 3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[x] checkpoint confermato**.
-4. **M4.4 — UI stazioni vicine**: richiesta permesso runtime, stato ViewModel/repository non persistente, lista Compose Eni con ranking M4.3 e spazio `ultimo aggiornamento`; nessuna cache/Room/WorkManager. **[x] implementato e CI branch verde; in attesa di conferma utente**.
-5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra.
+4. **M4.4 — UI stazioni vicine**: richiesta permesso runtime, stato ViewModel/repository non persistente, lista Compose Eni con ranking M4.3 e spazio `ultimo aggiornamento`; nessuna cache/Room/WorkManager. **[x] checkpoint confermato**.
+5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra. **[~] autorizzato**.
 
 Deliverable M4.1:
 - [x] client HTTPS per i due endpoint MIMIT;
@@ -351,6 +369,18 @@ Deliverable M4.4:
 - [x] test JVM pertinenti senza rete pubblica;
 - [x] CI reale sul branch M4.4 con test, APK e firma persistente verdi;
 - [x] nessuna modifica a schema Room/cache/import persistente/WorkManager.
+
+Deliverable M4.5:
+- [ ] schema Room v2 con cache stazioni/prezzi MIMIT + sync state e migrazione 1→2 che preserva i dati M3;
+- [ ] import in memoria dei due CSV, filtro Eni/prezzi associati, validazione e sostituzione cache in singola transazione atomica;
+- [ ] failure rete/formato/parsing/validazione/persistenza non distruttiva, senza crash e con cache/timestamp precedenti invariati;
+- [ ] `lastSuccessfulUpdateEpochMillis` persistito e aggiornato esclusivamente su import riuscito;
+- [ ] logger locale `W2Full-MIMIT` con causa tecnica/throwable separato dal messaggio utente;
+- [ ] UI cache-first con messaggio refresh non bloccante, pulsante manuale `Aggiorna`, dati cached preservati su errore e ultimo aggiornamento relativo + assoluto;
+- [ ] WorkManager 2.11.2 con unique periodic work giornaliero e vincolo rete, usando lo stesso `refresh()` del repository;
+- [ ] test obbligatori di atomicità/cache/timestamp/header/parse/download/UI/logger/migrazione/worker senza Internet reale;
+- [ ] CI reale sul branch M4.5 con test, APK e firma persistente verdi;
+- [ ] nessuna integrazione su `main` prima della conferma esplicita dell'utente.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -434,6 +464,12 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.4 confermata, M4.5 avviata
+- M4.4 confermata dall'utente dopo verifica del codice reale, della navigazione locale `Registro` / `Stazioni` senza libreria Navigation e del run fallito/corretto.
+- M4.5 autorizzata come checkpoint conclusivo di M4, ma senza integrazione su `main` prima di una nuova conferma esplicita.
+- Fissato schema Room v2 con migrazione 1→2 non distruttiva, cache snapshot Eni/prezzi/sync state, refresh atomico condiviso tra UI e worker, timestamp ultimo successo, logger `W2Full-MIMIT` e WorkManager 2.11.2 giornaliero.
+- I test M4.5 devono coprire tutti i failure mode richiesti e restano completamente offline rispetto a MIMIT reale.
 
 ### 2026-09-02 — M4.4 implementata e verificata sul branch
 - Aggiunta app shell Compose minima `Registro` / `Stazioni`, mantenendo invariato il CRUD M3 e senza introdurre la libreria Navigation.
