@@ -7,6 +7,7 @@ on:
       - m2-android-scaffold
       - m3-refueling-register
       - m4-mimit-csv
+      - m4-eni-filter
   workflow_dispatch:
 
 permissions:
