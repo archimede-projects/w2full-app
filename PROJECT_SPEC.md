@@ -264,7 +264,7 @@ Checkpoint M4.1 confermato il **2 settembre 2026**: commit `256060bef4e6b2af43c2
 Decisioni tecniche M4.2 — filtro bandiera Eni:
 - il filtro opera esclusivamente sui `MimitStation` già scaricati e parsati da M4.1; nessuna rete, Room, cache, Repository applicativo, posizione o UI viene introdotta in M4.2;
 - la bandiera viene normalizzata con `trim`, compressione degli spazi interni e confronto case-insensitive via `Locale.ROOT`;
-- è considerata Eni soltanto la bandiera normalizzata esattamente uguale a `eni`; non si usa `contains`, così valori diversi che contengono la sottostringa `eni` non vengono classificati per errore;
+- il contratto M4.2 originario considerava Eni soltanto la bandiera normalizzata esattamente uguale a `eni`; la validazione reale del dataset MIMIT del 2 settembre 2026 ha mostrato che la bandiera corrente usa anche il valore ufficialmente osservato `Agip Eni`. L'hotfix post-preview mantiene un confronto **esatto** su whitelist normalizzata (`eni`, `agip eni`) e continua a vietare `contains`, così valori diversi che contengono la sottostringa `eni` non vengono classificati per errore;
 - il filtro preserva l'ordine originale dei record e, quando applicato a `MimitDataset<MimitStation>`, preserva anche `extractionDate`;
 - test dedicati devono coprire `Eni`, varianti di maiuscole/minuscole e spazi, insieme a non-match come `Q8`, `Pompe Bianche`, stringa vuota e valori contenenti ma non uguali a `Eni`.
 
@@ -274,7 +274,7 @@ Decisioni tecniche M4.3 — posizione utente e distanza:
 - dipendenza Google Play services Location `21.4.0`, versione stabile corrente verificata sulla documentazione ufficiale il 2 settembre 2026; accesso tramite `FusedLocationProviderClient`, senza introdurre servizi a pagamento o backend;
 - il manifest dichiara `ACCESS_COARSE_LOCATION` e `ACCESS_FINE_LOCATION`; M4.3 non introduce ancora UI né dialog di richiesta permesso: il flusso di richiesta esplicita resta a M4.4, mentre il provider M4.3 deve funzionare correttamente quando uno dei due permessi è già concesso;
 - il provider restituisce un risultato tipizzato: `Available(GeoPoint)`, `PermissionDenied` oppure `Unavailable`; permesso negato/revocato, location `null`, Google Play services non disponibile o errore del provider non devono causare crash;
-- la posizione viene richiesta con `FusedLocationProviderClient.getCurrentLocation` a priorità bilanciata; la cancellazione coroutine deve cancellare anche la richiesta sottostante e non viene trasformata in errore applicativo;
+- la posizione viene richiesta con `FusedLocationProviderClient.getCurrentLocation` a priorità bilanciata; la cancellazione coroutine deve cancellare anche la richiesta sottostante e non viene trasformata in errore applicativo. Dopo la validazione reale su Galaxy S25 del 2 settembre 2026, il contratto viene rafforzato con timeout applicativo esplicito di **12 secondi**: alla scadenza la richiesta sottostante viene cancellata e il risultato degrada a `Unavailable`, mentre una cancellazione esterna della coroutine continua a propagarsi;
 - `GeoPoint` valida coordinate finite con latitudine `[-90, 90]` e longitudine `[-180, 180]`;
 - distanza geodetica calcolata con Haversine usando raggio terrestre medio `6371.0088 km`: `a = sin²(Δφ/2) + cos φ1 * cos φ2 * sin²(Δλ/2)`, `c = 2 * atan2(√a, √(1-a))`, `distanceKm = R * c`;
 - il ranking opera sulle sole stazioni Eni ottenute tramite `MimitStationFilter`; con posizione disponibile, stazioni con coordinate valide sono ordinate per distanza crescente, poi deterministicamente per nome/comune/indirizzo/id; stazioni con coordinate mancanti o invalide hanno `distanceKm = null` e vengono poste dopo quelle localizzabili;
@@ -294,7 +294,7 @@ Decisioni tecniche M4.4 — UI stazioni vicine:
 - se la posizione è disponibile, la UI mostra stato `Posizione disponibile` e la lista Eni ordinata per distanza crescente; se il permesso è negato mostra stato `Permesso posizione negato` e lista alfabetica; se il provider restituisce `Unavailable` mostra `Posizione non disponibile` e lista alfabetica. Nessuno dei tre stati deve causare crash;
 - quando il permesso è negato, la schermata espone un'azione esplicita per richiedere nuovamente il permesso; non esiste loop automatico di richieste dopo un rifiuto;
 - ogni riga stazione mostra almeno nome (o fallback leggibile), indirizzo/comune/provincia e distanza formattata quando presente; con `distanceKm = null` mostra `Distanza non disponibile`;
-- lo stato UI include già `lastSuccessfulUpdateEpochMillis: Long?` per il requisito M4.5. In M4.4 resta `null` perché non esiste ancora cache persistente e la schermata riserva comunque lo spazio con testo placeholder `Ultimo aggiornamento: non ancora disponibile`; M4.5 sostituirà il placeholder con l'età derivata dal timestamp persistito;
+- lo stato UI include già `lastSuccessfulUpdateEpochMillis: Long?` per il requisito M4.5. In M4.4 resta `null` perché non esiste ancora cache persistente e la schermata riserva comunque lo spazio con testo placeholder `Ultimo aggiornamento: non ancora disponibile`; M4.5 sostituirà il placeholder con l'età derivata dal timestamp persistito. L'hotfix post-preview richiede inoltre che lo stato posizione venga risolto **indipendentemente** dall'esistenza di una cache/snapshot MIMIT: un refresh MIMIT fallito non può lasciare la UI indefinitamente in `Posizione in attesa`;
 - errori di download/parsing nella sessione M4.4 diventano uno stato UI non tecnico (`Impossibile caricare le stazioni al momento`) e non provocano crash; la resilienza con cache valida resta responsabilità M4.5;
 - M4.4 non introduce prezzi persistiti, import locale, schema Room, cache, `lastSuccessfulUpdateEpochMillis` persistito, refresh schedulato o WorkManager.
 
@@ -332,7 +332,7 @@ Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazion
 2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] checkpoint confermato**.
 3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[x] checkpoint confermato**.
 4. **M4.4 — UI stazioni vicine**: richiesta permesso runtime, stato ViewModel/repository non persistente, lista Compose Eni con ranking M4.3 e spazio `ultimo aggiornamento`; nessuna cache/Room/WorkManager. **[x] checkpoint confermato**.
-5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra. **[x] chiuso sul branch, in attesa di conferma prima di qualsiasi integrazione**.
+5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra. **[x] chiuso e confermato dall'utente sul branch; non integrato su `main`**.
 
 Deliverable M4.1:
 - [x] client HTTPS per i due endpoint MIMIT;
@@ -382,7 +382,26 @@ Deliverable M4.5:
 - [x] CI reale sul branch M4.5 con test, APK e firma persistente verdi;
 - [x] nessuna integrazione su `main` prima della conferma esplicita dell'utente.
 
-Verifica applicativa finale M4.5 sul branch `m4-cache-sync`: HEAD `c0c00198a8bac6f6640eb161cd09eeccfd234e69`; run GitHub Actions `33604090117`, job `100164035590`, tutti gli step obbligatori `success`; `testDebugUnitTest` = `BUILD SUCCESSFUL in 1m 4s`, `assembleDebug` = `BUILD SUCCESSFUL in 31s`; artifact `w2full-debug-apk` ID `9836346789`, dimensione `14165842` byte, digest ZIP `sha256:4455db8ff9b32d21aaaeeeb58ae2016bd7a762ff0824baed3302a9e55c7d45e0`; firma APK v2 con un signer, certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`, invariati rispetto alle milestone precedenti. Il run applicativo iniziale `33603528312` aveva correttamente bloccato la compilazione per function reference Kotlin non consentite; il fix `cd2e40db7868cf472df973678eaffa08634a5e06` ha prodotto il run verde `33603750101`, quindi il cleanup warning `c0c00198a8bac6f6640eb161cd09eeccfd234e69` è stato nuovamente verificato dal run finale sopra. M4.5 resta confinata al branch e M4 complessiva non viene chiusa né integrata su `main` senza nuova conferma utente.
+Verifica applicativa finale M4.5 sul branch `m4-cache-sync`: HEAD `c0c00198a8bac6f6640eb161cd09eeccfd234e69`; run GitHub Actions `33604090117`, job `100164035590`, tutti gli step obbligatori `success`; `testDebugUnitTest` = `BUILD SUCCESSFUL in 1m 4s`, `assembleDebug` = `BUILD SUCCESSFUL in 31s`; artifact `w2full-debug-apk` ID `9836346789`, dimensione `14165842` byte, digest ZIP `sha256:4455db8ff9b32d21aaaeeeb58ae2016bd7a762ff0824baed3302a9e55c7d45e0`; firma APK v2 con un signer, certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`, invariati rispetto alle milestone precedenti. Il run applicativo iniziale `33603528312` aveva correttamente bloccato la compilazione per function reference Kotlin non consentite; il fix `cd2e40db7868cf472df973678eaffa08634a5e06` ha prodotto il run verde `33603750101`, quindi il cleanup warning `c0c00198a8bac6f6640eb161cd09eeccfd234e69` è stato nuovamente verificato dal run finale sopra. M4.5 resta confinata al branch e M4 complessiva non viene chiusa né integrata su `main` senza nuova conferma utente. Il checkpoint M4.5 è stato confermato dall'utente il **2 settembre 2026** dopo verifica di commit, CI, spec e firma persistente.
+
+### Hotfix post-preview M4 — validazione reale Galaxy S25
+Stato: **[~] in corso sul branch `hotfix-device-validation`; nessuna integrazione su `main`**
+
+Evidenze reali raccolte il **2 settembre 2026** installando la GitHub Release `v0.4.5-preview` su Samsung Galaxy S25:
+- il refresh mostra `Impossibile aggiornare i prezzi al momento`; il logger `W2Full-MIMIT` identifica `MimitCsvFormatException: Row 168 has 11 fields; expected 10` durante `parseStations`, quindi il guasto avviene sull'anagrafica prima del download/preparazione prezzi;
+- il file pubblico MIMIT fornito dall'utente, estrazione `2026-09-01`, ha SHA-256 `b54f46fe88ebe5993eb64db7c84c2bdcdf1771d3069691e61d0a1292ef520f12`, dimensione `3581955` byte e `23943` record impianto: `23831` record hanno le 10 colonne attese, `110` ne producono 11 e `2` ne producono 12 con il parser delimitato standard;
+- i `112` record anomali condividono l'artefatto reale `| gestori.prezzibenzina.it` non quotato dentro un campo testuale; il primo caso osservato include l'impianto `40820` e il valore logico `STOIL SIMPLE | gestori.prezzibenzina.it`;
+- sullo stesso dataset la bandiera esatta normalizzata `eni` compare `0` volte, mentre `Agip Eni` compare `4450` volte: correggere soltanto il parser lascerebbe quindi il filtro M4.2 con insieme Eni vuoto;
+- con permessi COARSE/FINE concessi, la UI resta su `Posizione in attesa` perché lo stato location viene applicato soltanto attraverso uno snapshot stazioni che il refresh fallito non produce; inoltre `getCurrentLocation()` non possiede un timeout applicativo e potrebbe sospendersi indefinitamente se Play Services non completa la Task.
+
+Contratto hotfix vincolante prima del codice:
+1. **Parser anagrafica reale** — ricomporre esclusivamente l'artefatto noto `gestori.prezzibenzina.it` quando genera colonne extra nel record stazione; dopo la ricomposizione restano obbligatorie esattamente 10 colonne. Qualunque altra riga sovrannumeraria continua a produrre `MimitCsvFormatException`; nessun generico “best effort” o scarto silenzioso di record.
+2. **Filtro Eni** — whitelist esatta dopo normalizzazione: `eni` e `agip eni`; nessun `contains`, nessun prefisso/suffisso permissivo.
+3. **Posizione indipendente dalla cache** — la richiesta/stato posizione deve poter risolversi in `Available`, `PermissionDenied` o `Unavailable` anche con cache vuota e refresh MIMIT fallito; il testo `Verifica della posizione in corso` deve rappresentare soltanto una richiesta realmente in corso.
+4. **Timeout Fused Location** — timeout applicativo `12 s`; allo scadere cancellare la richiesta Fused sottostante e restituire `Unavailable`, preservando la propagazione della cancellazione esterna.
+5. **Resilienza M4.5 invariata** — refresh atomico, cache/timestamp precedenti preservati su failure, logger `W2Full-MIMIT`, messaggio utente non tecnico, stessa semantica manuale/worker.
+6. **Regression test offline obbligatori** — caso reale 11 campi dell'impianto `40820`; caso rappresentativo 12 campi con doppio artefatto; riga 11 campi non riconosciuta ancora rifiutata; `Agip Eni` incluso ma `Eni Plus`/`SuperEni` esclusi; refresh con dataset `Agip Eni` non fallisce per insieme Eni vuoto; stato location risolto anche senza cache dopo failure MIMIT; provider che non completa mai termina in `Unavailable` entro timeout virtuale; cancellazione esterna continua a propagarsi.
+7. I test CI restano senza rete/GPS pubblici; dopo CI verde è richiesta una nuova GitHub Release preview firmata con la chiave persistente e una nuova verifica reale sul Galaxy S25 prima di considerare chiuso l'hotfix.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -483,6 +502,13 @@ Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa p
 
 ## 10. Changelog
 
+### 2026-09-02 — hotfix post-preview avviato dopo test reale Galaxy S25
+- L'utente ha confermato M4.5 ma, prima di qualunque integrazione M4, ha installato `v0.4.5-preview` dalla GitHub Release e rilevato due problemi reali non coperti dalle fixture/MockWebServer.
+- Il bug report limitato ai dati W2Full ha identificato `MimitCsvFormatException: Row 168 has 11 fields; expected 10`; l'analisi del CSV pubblico MIMIT `anagrafica_impianti_attivi.csv` del 2026-09-01 (SHA-256 `b54f46fe88ebe5993eb64db7c84c2bdcdf1771d3069691e61d0a1292ef520f12`) ha confermato 112 record con pipe non quotata associata a `gestori.prezzibenzina.it`.
+- Lo stesso dataset mostra `Agip Eni` come bandiera Eni reale corrente (`4450` record) e nessun record con bandiera esatta `Eni`; il contratto filtro viene quindi corretto in whitelist esatta `eni` / `agip eni`, senza `contains`.
+- Diagnosticato che `Posizione in attesa` può restare indefinitamente perché lo stato location dipende dallo snapshot MIMIT; confermata inoltre l'assenza di timeout applicativo su `getCurrentLocation()`.
+- Avviato branch isolato `hotfix-device-validation` dal commit taggato `v0.4.5-preview`; fissati prima del codice parser mirato, filtro Eni corretto, posizione indipendente dalla cache e timeout Fused Location di 12 secondi. `main` resta invariato e M4 complessiva non viene chiusa/integrata.
+
 ### 2026-09-02 — distribuzione GitHub Releases avviata come checkpoint isolato
 - Avviato sul branch dedicato `release-distribution` un intervento infrastrutturale separato da M4/M4.5 e senza modifiche a `main`.
 - Fissato il requisito permanente: gli APK installabili vengono distribuiti esclusivamente come asset di GitHub Releases taggate; gli artifact Actions restano ammessi soltanto per verifica interna dei run.
@@ -521,7 +547,7 @@ Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa p
 
 ### 2026-09-02 — M4.3 implementata e verificata sul branch
 - Aggiunti `GeoPoint`, Haversine e provider `FusedLocationProviderClient` resiliente con esiti `Available`, `PermissionDenied` e `Unavailable`; solo permessi foreground `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION`, nessun background location.
-- Aggiunto ranking delle sole stazioni Eni già filtrate da M4.2: distanza crescente quando la posizione è disponibile; coordinate assenti/invalide in coda; senza posizione tutte le distanze restano `null` e viene usato fallback alfabetico deterministico.
+- Aggiunto ranking delle sole stazioni Eni già filtrate da M4.2: distanza crescente quando disponibile; coordinate assenti/invalide in coda; senza posizione tutte le distanze restano `null` e viene usato fallback alfabetico deterministico.
 - Test JVM coprono rotta Haversine nota, simmetria, coordinate invalide, esclusione non-Eni, ordinamento per distanza, permesso negato, posizione unavailable, failure provider e propagazione della cancellazione.
 - Run branch `33597805710`, job `100144721666`, completamente verde; artifact `9834047769`, dimensione `13799932` byte, digest `sha256:864421ad44b5379d6c897dd33dac9a509c8a9db77965f4f382c085bac22a80a4`; certificato persistente invariato `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`.
 - M4.3 resta sul branch `m4-location-distance`; nessuna UI, cache/Room, import o WorkManager è stata introdotta e M4.4/M4.5 non sono stati avviati.
