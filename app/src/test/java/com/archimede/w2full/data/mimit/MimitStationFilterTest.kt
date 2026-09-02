@@ -8,17 +8,20 @@ import org.junit.Test
 
 class MimitStationFilterTest {
     @Test
-    fun recognizesOnlyNormalizedExactEniBrand() {
+    fun recognizesOnlyNormalizedExactEniAliases() {
         assertTrue(MimitStationFilter.isEniBrand("Eni"))
         assertTrue(MimitStationFilter.isEniBrand(" ENI "))
         assertTrue(MimitStationFilter.isEniBrand("eni"))
         assertTrue(MimitStationFilter.isEniBrand("\tEnI\n"))
+        assertTrue(MimitStationFilter.isEniBrand("Agip Eni"))
+        assertTrue(MimitStationFilter.isEniBrand("  AGIP   ENI  "))
 
         assertFalse(MimitStationFilter.isEniBrand("Q8"))
         assertFalse(MimitStationFilter.isEniBrand("Pompe Bianche"))
         assertFalse(MimitStationFilter.isEniBrand(""))
         assertFalse(MimitStationFilter.isEniBrand("Eni Plus"))
         assertFalse(MimitStationFilter.isEniBrand("SuperEni"))
+        assertFalse(MimitStationFilter.isEniBrand("Agip Eni Plus"))
     }
 
     @Test
@@ -26,9 +29,9 @@ class MimitStationFilterTest {
         val stations = listOf(
             station(id = 1, brand = "Q8"),
             station(id = 2, brand = "Eni"),
-            station(id = 3, brand = " ENI "),
+            station(id = 3, brand = "Agip Eni"),
             station(id = 4, brand = "Pompe Bianche"),
-            station(id = 5, brand = "eni"),
+            station(id = 5, brand = "  AGIP   ENI  "),
         )
 
         val filtered = MimitStationFilter.eniStations(stations)
@@ -42,7 +45,7 @@ class MimitStationFilterTest {
         val dataset = MimitDataset(
             extractionDate = extractionDate,
             rows = listOf(
-                station(id = 10, brand = "Eni"),
+                station(id = 10, brand = "Agip Eni"),
                 station(id = 11, brand = "Q8"),
                 station(id = 12, brand = "ENI"),
             ),
