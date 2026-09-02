@@ -1,0 +1,117 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-debug-apk:
+    runs-on: ubuntu-latest
+    env:
+      W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
+      W2FULL_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEYSTORE_PASSWORD }}
+      W2FULL_DEBUG_KEY_ALIAS: ${{ secrets.W2FULL_DEBUG_KEY_ALIAS }}
+      W2FULL_DEBUG_KEY_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEY_PASSWORD }}
+      W2FULL_EXPECTED_CERT_SHA256: bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265
+
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.5.0"
+
+      - name: Require persistent debug signing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in \
+            W2FULL_DEBUG_KEYSTORE_BASE64 \
+            W2FULL_DEBUG_KEYSTORE_PASSWORD \
+            W2FULL_DEBUG_KEY_ALIAS \
+            W2FULL_DEBUG_KEY_PASSWORD
+          do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required persistent signing secret $name is missing. Release aborted."
+              exit 1
+            fi
+          done
+
+      - name: Restore persistent debug keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/w2full-debug.keystore"
+          printf '%s' "$W2FULL_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "W2FULL_DEBUG_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "Persistent debug keystore enabled for tagged release."
+
+      - name: Run JVM tests
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK and persistent signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          grep -F "certificate SHA-256 digest: $W2FULL_EXPECTED_CERT_SHA256" <<< "$VERIFY_OUTPUT"
+          echo "Persistent signing certificate verified: $W2FULL_EXPECTED_CERT_SHA256"
+
+      - name: Prepare versioned Release APK
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_APK="app/build/outputs/apk/debug/app-debug.apk"
+          mkdir -p dist
+          RELEASE_APK="dist/w2full-${GITHUB_REF_NAME}-debug.apk"
+          cp "$SOURCE_APK" "$RELEASE_APK"
+          test -s "$RELEASE_APK"
+          APK_SHA256="$(sha256sum "$RELEASE_APK" | awk '{print $1}')"
+          echo "apk_sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
+          echo "release_apk=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+          ls -lh "$RELEASE_APK"
+          echo "APK SHA-256: $APK_SHA256"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          name: W2Full ${{ github.ref_name }}
+          body: |
+            W2Full debug — `${{ github.ref_name }}`
+
+            Checkpoint/milestone: build taggata documentata in `PROJECT_SPEC.md` al commit `${{ github.sha }}`.
+
+            - Test JVM: superati prima della pubblicazione
+            - Build debug APK: riuscita
+            - Firma persistente verificata: `${{ env.W2FULL_EXPECTED_CERT_SHA256 }}`
+            - APK SHA-256: `${{ steps.package.outputs.apk_sha256 }}`
+          prerelease: ${{ contains(github.ref_name, 'preview') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          fail_on_unmatched_files: true
+          files: ${{ steps.package.outputs.release_apk }}
