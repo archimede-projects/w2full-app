@@ -16,6 +16,7 @@ class MimitCsvParser {
     fun parseStations(text: String): MimitDataset<MimitStation> = parseTable(
         text = text,
         expectedHeaders = STATION_HEADERS,
+        rowNormalizer = ::normalizeStationFields,
         rowMapper = { fields, rowNumber ->
             MimitStation(
                 id = fields[0].requiredLong("idimpianto", rowNumber),
@@ -51,6 +52,7 @@ class MimitCsvParser {
     private fun <T> parseTable(
         text: String,
         expectedHeaders: List<String>,
+        rowNormalizer: (List<String>, Int) -> List<String> = { fields, _ -> fields },
         rowMapper: (List<String>, Int) -> T,
     ): MimitDataset<T> {
         val rows = try {
@@ -81,15 +83,33 @@ class MimitCsvParser {
             .drop(headerIndex + 1)
             .mapIndexed { dataIndex, fields ->
                 val rowNumber = headerIndex + dataIndex + 2
-                if (fields.size != expectedHeaders.size) {
+                val normalizedFields = rowNormalizer(fields, rowNumber)
+                if (normalizedFields.size != expectedHeaders.size) {
                     throw MimitCsvFormatException(
-                        "Row $rowNumber has ${fields.size} fields; expected ${expectedHeaders.size}",
+                        "Row $rowNumber has ${normalizedFields.size} fields; expected ${expectedHeaders.size}",
                     )
                 }
-                rowMapper(fields, rowNumber)
+                rowMapper(normalizedFields, rowNumber)
             }
 
         return MimitDataset(extractionDate = extractionDate, rows = parsedRows)
+    }
+
+    private fun normalizeStationFields(fields: List<String>, @Suppress("UNUSED_PARAMETER") rowNumber: Int): List<String> {
+        if (fields.size <= STATION_HEADERS.size) return fields
+
+        val normalized = fields.toMutableList()
+        while (normalized.size > STATION_HEADERS.size) {
+            val artifactIndex = normalized.indexOfFirst { field ->
+                field.trim().equals(KNOWN_UNESCAPED_TEXT_FRAGMENT, ignoreCase = true)
+            }
+            if (artifactIndex <= 0) break
+
+            normalized[artifactIndex - 1] =
+                normalized[artifactIndex - 1] + "|" + normalized[artifactIndex]
+            normalized.removeAt(artifactIndex)
+        }
+        return normalized
     }
 
     private fun normalizeHeader(value: String): String = value
@@ -139,6 +159,8 @@ class MimitCsvParser {
     }
 
     private companion object {
+        const val KNOWN_UNESCAPED_TEXT_FRAGMENT = "gestori.prezzibenzina.it"
+
         val STATION_HEADERS = listOf(
             "idimpianto",
             "Gestore",
