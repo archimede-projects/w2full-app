@@ -27,7 +27,7 @@ W2Full è un'app Android nativa, gratuita e locale per un singolo veicolo V1: re
 - M1 — design: **[x]**
 - M2 — scaffold Android/CI/firma: **[x]**
 - M3 — registro rifornimenti/calcoli: **[x]**
-- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5 e hotfix device/prices verificati, non integrati su `main`**
+- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5 e hotfix device/prices verificati, substep carburante veicolo in corso; nulla integrato su `main`**
 - M5 — storico prezzi + grafico: **[ ]**
 - M6 — notifiche soglia: **[ ]**
 - M7 — rifiniture: **[ ]**
@@ -109,9 +109,60 @@ Confermata dall'utente il **2 settembre 2026** su `v0.4.5-preview.3`:
 - fallback `Prezzo non disponibile` osservato su una stazione senza prezzo Benzina compatibile;
 - distanza e indirizzo restano visibili.
 
-L'hotfix prezzi è quindi chiuso. La possibilità di modificare `defaultFuelType` dall'interfaccia è un substep separato e non viene retroattivamente incluso in questo hotfix.
+L'hotfix prezzi è chiuso. Commit di chiusura: `5a512fc5392835ea484b3c483df2cb10166a56e1`; CI di chiusura run `33665212254`, job `100365142376`, **SUCCESS**. Issue #2 chiusa come completata.
 
-## 6. Requisito UX futuro già approvato — Indicazioni
+## 6. Substep M4 corrente — carburante predefinito del veicolo
+
+Stato: **[~] autorizzato il 2 settembre 2026; branch dedicato `m4-vehicle-fuel-setting`**. Issue di tracciamento: `#3 M4: configurare il carburante predefinito del veicolo`.
+
+### 6.1 Scopo
+
+Rendere modificabile dall'interfaccia il campo già esistente `VehicleEntity.defaultFuelType`, che la schermata Stazioni usa per scegliere i prezzi MIMIT. Non introdurre un nuovo modello veicolo, non cambiare lo schema Room e non alterare i rifornimenti storici.
+
+### 6.2 UI e navigazione
+
+- Aggiungere una terza destinazione locale nella bottom navigation: **`Veicolo`**.
+- Nessuna libreria Navigation nuova: mantenere la shell Compose locale già usata per `Registro` e `Stazioni`.
+- La schermata Veicolo mostra almeno il nome V1 e il carburante predefinito corrente.
+- La selezione deve essere chiara e touch-friendly su Galaxy S25; il salvataggio è immediato alla scelta, senza pulsante obbligatorio `Salva`.
+- Mostrare un feedback non invasivo dello stato corrente; errori locali di persistenza non devono crashare l'app.
+
+### 6.3 Opzioni carburante
+
+- Lista base sempre disponibile: `Benzina`, `Gasolio`, `GPL`, `Metano`.
+- Se esiste cache MIMIT, aggiungere tutte le `fuel_description` distinte presenti in `mimit_prices`.
+- Deduplicare con la stessa normalizzazione trim/compressione spazi/case-insensitive già usata nel matching prezzi, preservando una label canonica leggibile.
+- Ordinare alfabeticamente le opzioni, ma mantenere sempre selezionabile il valore attualmente salvato anche se non è nella cache né nella lista base.
+- Persistire esattamente la label scelta; nessun mapping permissivo `contains`.
+
+### 6.4 Persistenza e aggiornamento Stazioni
+
+- Aggiungere a `VehicleDao` un update mirato di `default_fuel_type` per `vehicleId = 1`.
+- Nessuna migrazione DB: il campo esiste già in schema v1/v2.
+- Nessuna rete necessaria per cambiare carburante.
+- Dopo il cambio, tornando a `Stazioni`, lo snapshot deve leggere il nuovo `defaultFuelType` e mostrare i prezzi corrispondenti dalla cache MIMIT esistente, senza richiedere `Aggiorna`.
+- Il cambio del carburante predefinito non modifica `RifornimentoEntity`, calcoli storici o valori già registrati.
+
+### 6.5 Test obbligatori offline
+
+Prima della preview devono risultare verdi almeno:
+- lista base disponibile con cache vuota;
+- opzioni MIMIT distinte aggiunte e deduplicate case/whitespace-insensitive;
+- valore corrente non presente nella cache resta selezionabile;
+- persistenza `defaultFuelType` su V1;
+- errore/update a zero righe gestito senza crash;
+- cambio da `Benzina` a un altro carburante riflesso nello snapshot Stazioni usando la stessa cache prezzi, senza refresh rete;
+- nessuna modifica ai record rifornimento;
+- tutti i test M3/M4 precedenti continuano a passare.
+
+### 6.6 Versione e verifica
+
+- Incrementare `versionCode` rispetto a preview.3; `versionName` resta nella linea M4 preview/hotfix.
+- CI branch obbligatorio: `testDebugUnitTest`, `assembleDebug`, `apksigner`, certificato persistente atteso.
+- Se verde, pubblicare una nuova GitHub Release preview installabile sopra `v0.4.5-preview.3` e richiedere verifica reale sul Galaxy S25.
+- Nessuna integrazione su `main` e nessuna chiusura M4 prima della conferma utente.
+
+## 7. Requisito UX futuro già approvato — Indicazioni
 
 Stato: **[ ] pianificato per M7**. Issue di tracciamento: `#1 UX: pulsante Indicazioni verso la stazione`.
 
@@ -120,25 +171,25 @@ Stato: **[ ] pianificato per M7**. Issue di tracciamento: `#1 UX: pulsante Indic
 - usare preferibilmente coordinate MIMIT valide, con fallback all'indirizzo quando opportuno;
 - nessuna mappa embedded in W2Full e nessun SDK Maps a pagamento richiesto.
 
-## 7. Distribuzione APK
+## 8. Distribuzione APK
 
 Il workflow permanente `.github/workflows/android-release.yml` deve creare Release esclusivamente da tag `v*`, ripetendo test/build e verifica firma sul commit taggato. I quattro secret del keystore sono obbligatori; nessun fallback a firma effimera è ammesso nel workflow Release. L'asset usa `w2full-<tag>-debug.apk`; le Release preview/rc sono prerelease.
 
-Il bootstrap temporaneo usato per creare le prime preview resta debito infrastrutturale isolato e deve essere rimosso nel checkpoint distribuzione; non va confuso con la chiusura degli hotfix M4 né con l'integrazione M4.
+Il bootstrap temporaneo usato per creare le prime preview resta debito infrastrutturale isolato e deve essere rimosso nel checkpoint distribuzione; non va confuso con i substep M4 né con l'integrazione M4.
 
-## 8. Decisioni aperte
+## 9. Decisioni aperte
 
 - raggio massimo stazioni;
 - retention storico prezzi M5;
 - libreria grafici definitiva M5;
 - schema CSV M7.
 
-## 9. Changelog corrente
+## 10. Changelog corrente
 
-### 2026-09-02 — preview.3 verificata, hotfix prezzi chiuso
-- Verificata sul Galaxy S25 `v0.4.5-preview.3`: posizione, ranking, prezzi Benzina Self/Servito, tre decimali, unità e fallback senza prezzo funzionanti.
-- Hotfix prezzi dichiarato chiuso; issue #2 può essere chiusa come completata.
-- Confermato che `defaultFuelType` è già persistito e consumato dalla schermata Stazioni, ma non è ancora modificabile dall'UI.
-- Autorizzato un substep M4 separato per aggiungere la configurazione del carburante del veicolo.
-- Requisito M7 `Indicazioni` resta tracciato separatamente.
-- `main` resta invariato; nessuna integrazione M4 autorizzata in questo passaggio.
+### 2026-09-02 — substep carburante veicolo autorizzato
+- `v0.4.5-preview.3` verificata sul Galaxy S25 e hotfix prezzi chiuso formalmente.
+- Creato branch `m4-vehicle-fuel-setting` dal commit di chiusura `5a512fc5392835ea484b3c483df2cb10166a56e1`.
+- Autorizzata una schermata `Veicolo` per modificare `defaultFuelType` senza rete e senza migrazione DB.
+- Opzioni base + descrizioni carburante distinte dalla cache MIMIT; cambio riflesso in Stazioni usando la cache esistente.
+- Issue #3 aperta per il substep.
+- `main` resta invariato; distribuzione cleanup e integrazione M4 restano separati.
