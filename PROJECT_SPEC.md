@@ -102,11 +102,11 @@ Legenda: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 
 ### Dati MIMIT
 - [x] Download + parsing dei due CSV MIMIT con fixture statiche e nessuna dipendenza dalla rete reale nei test CI.
-- [~] Import locale impianti/prezzi.
+- [x] Import locale impianti/prezzi.
 - [x] Filtro bandiera Eni.
 - [x] Posizione utente + Haversine.
 - [x] UI stazioni vicine.
-- [~] Refresh manuale + WorkManager giornaliero.
+- [x] Refresh manuale + WorkManager giornaliero.
 
 ### Storico/notifiche/rifiniture
 - [ ] Storico prezzi + grafico.
@@ -332,7 +332,7 @@ Sotto-passaggi M4, ciascuno con CI reale sul proprio branch prima di integrazion
 2. **M4.2 — filtro bandiera Eni**: normalizzazione/filtro bandiera e test dedicati. **[x] checkpoint confermato**.
 3. **M4.3 — posizione e distanza**: provider posizione resiliente, Haversine e ordinamento delle sole stazioni Eni; nessuna UI/cache/import. **[x] checkpoint confermato**.
 4. **M4.4 — UI stazioni vicine**: richiesta permesso runtime, stato ViewModel/repository non persistente, lista Compose Eni con ranking M4.3 e spazio `ultimo aggiornamento`; nessuna cache/Room/WorkManager. **[x] checkpoint confermato**.
-5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra. **[~] autorizzato**.
+5. **M4.5 — import/sync resiliente**: persistenza, cache atomica, `lastSuccessfulUpdateEpochMillis`, logging `W2Full-MIMIT`, refresh manuale e WorkManager giornaliero secondo i requisiti vincolanti sopra. **[x] chiuso sul branch, in attesa di conferma prima di qualsiasi integrazione**.
 
 Deliverable M4.1:
 - [x] client HTTPS per i due endpoint MIMIT;
@@ -371,16 +371,18 @@ Deliverable M4.4:
 - [x] nessuna modifica a schema Room/cache/import persistente/WorkManager.
 
 Deliverable M4.5:
-- [ ] schema Room v2 con cache stazioni/prezzi MIMIT + sync state e migrazione 1→2 che preserva i dati M3;
-- [ ] import in memoria dei due CSV, filtro Eni/prezzi associati, validazione e sostituzione cache in singola transazione atomica;
-- [ ] failure rete/formato/parsing/validazione/persistenza non distruttiva, senza crash e con cache/timestamp precedenti invariati;
-- [ ] `lastSuccessfulUpdateEpochMillis` persistito e aggiornato esclusivamente su import riuscito;
-- [ ] logger locale `W2Full-MIMIT` con causa tecnica/throwable separato dal messaggio utente;
-- [ ] UI cache-first con messaggio refresh non bloccante, pulsante manuale `Aggiorna`, dati cached preservati su errore e ultimo aggiornamento relativo + assoluto;
-- [ ] WorkManager 2.11.2 con unique periodic work giornaliero e vincolo rete, usando lo stesso `refresh()` del repository;
-- [ ] test obbligatori di atomicità/cache/timestamp/header/parse/download/UI/logger/migrazione/worker senza Internet reale;
-- [ ] CI reale sul branch M4.5 con test, APK e firma persistente verdi;
-- [ ] nessuna integrazione su `main` prima della conferma esplicita dell'utente.
+- [x] schema Room v2 con cache stazioni/prezzi MIMIT + sync state e migrazione 1→2 che preserva i dati M3;
+- [x] import in memoria dei due CSV, filtro Eni/prezzi associati, validazione e sostituzione cache in singola transazione atomica;
+- [x] failure rete/formato/parsing/validazione/persistenza non distruttiva, senza crash e con cache/timestamp precedenti invariati;
+- [x] `lastSuccessfulUpdateEpochMillis` persistito e aggiornato esclusivamente su import riuscito;
+- [x] logger locale `W2Full-MIMIT` con causa tecnica/throwable separato dal messaggio utente;
+- [x] UI cache-first con messaggio refresh non bloccante, pulsante manuale `Aggiorna`, dati cached preservati su errore e ultimo aggiornamento relativo + assoluto;
+- [x] WorkManager 2.11.2 con unique periodic work giornaliero e vincolo rete, usando lo stesso `refresh()` del repository;
+- [x] test obbligatori di atomicità/cache/timestamp/header/parse/download/UI/logger/migrazione/worker senza Internet reale;
+- [x] CI reale sul branch M4.5 con test, APK e firma persistente verdi;
+- [x] nessuna integrazione su `main` prima della conferma esplicita dell'utente.
+
+Verifica applicativa finale M4.5 sul branch `m4-cache-sync`: HEAD `c0c00198a8bac6f6640eb161cd09eeccfd234e69`; run GitHub Actions `33604090117`, job `100164035590`, tutti gli step obbligatori `success`; `testDebugUnitTest` = `BUILD SUCCESSFUL in 1m 4s`, `assembleDebug` = `BUILD SUCCESSFUL in 31s`; artifact `w2full-debug-apk` ID `9836346789`, dimensione `14165842` byte, digest ZIP `sha256:4455db8ff9b32d21aaaeeeb58ae2016bd7a762ff0824baed3302a9e55c7d45e0`; firma APK v2 con un signer, certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`, invariati rispetto alle milestone precedenti. Il run applicativo iniziale `33603528312` aveva correttamente bloccato la compilazione per function reference Kotlin non consentite; il fix `cd2e40db7868cf472df973678eaffa08634a5e06` ha prodotto il run verde `33603750101`, quindi il cleanup warning `c0c00198a8bac6f6640eb161cd09eeccfd234e69` è stato nuovamente verificato dal run finale sopra. M4.5 resta confinata al branch e M4 complessiva non viene chiusa né integrata su `main` senza nuova conferma utente.
 
 ### M5 — Storico prezzi + grafico
 Stato: **[ ] da fare**
@@ -464,6 +466,15 @@ M3 ha ripetuto la verifica sul codice completo direttamente su `main` nel run `3
 Per M4 ogni sotto-passaggio usa un branch dedicato e deve completare la stessa pipeline reale prima di qualsiasi integrazione. I test MIMIT non devono effettuare richieste alla rete pubblica: usano fixture statiche e, quando serve verificare il client HTTP, un server locale di test.
 
 ## 10. Changelog
+
+### 2026-09-02 — M4.5 chiusa sul branch, in attesa di conferma
+- M4.5 implementata sul branch `m4-cache-sync` sopra il checkpoint M4.4 confermato; nessuna integrazione su `main` è stata eseguita e M4 complessiva resta `[~] in corso`.
+- Contratto M4.5 fissato prima del codice nel commit `c56578c781cf7a870e6a45f0400e3cfbd7871418`; implementazione principale `815c36bfd13091ba1bb15c2b04bf0ab39d6c35e4`.
+- Il primo run `33603528312` / job `100162296015` ha correttamente bloccato la compilazione per function reference Kotlin non consentite; il fix `cd2e40db7868cf472df973678eaffa08634a5e06` ha prodotto il run verde `33603750101` / job `100162982707`.
+- Il cleanup warning finale `c0c00198a8bac6f6640eb161cd09eeccfd234e69` è stato verificato dal run `33604090117` / job `100164035590`: test e build entrambi `BUILD SUCCESSFUL`, verifica firma persistente e upload artifact tutti `success`.
+- Artifact applicativo finale `w2full-debug-apk`: ID `9836346789`, dimensione `14165842` byte, digest ZIP `sha256:4455db8ff9b32d21aaaeeeb58ae2016bd7a762ff0824baed3302a9e55c7d45e0`; certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
+- Chiusi i deliverable M4.5: Room v2/migrazione 1→2, cache MIMIT atomica e non distruttiva, timestamp ultimo successo, UI cache-first con età relativa+assoluta, logger `W2Full-MIMIT`, refresh manuale e WorkManager 2.11.2 con semantica repository condivisa, test offline di tutti i failure mode richiesti.
+- M4.5 è `[x]` sul branch; il merge su `main` e la chiusura complessiva M4 restano vietati fino a nuova conferma esplicita dell'utente.
 
 ### 2026-09-02 — M4.4 confermata, M4.5 avviata
 - M4.4 confermata dall'utente dopo verifica del codice reale, della navigazione locale `Registro` / `Stazioni` senza libreria Navigation e del run fallito/corretto.
