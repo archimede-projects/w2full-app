@@ -71,6 +71,7 @@ dependencies {
     val roomVersion = "2.8.4"
     val lifecycleVersion = "2.11.0"
     val okhttpVersion = "5.5.0"
+    val playServicesLocationVersion = "21.4.0"
 
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.13.0")
@@ -85,6 +86,7 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion")
 
     implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
+    implementation("com.google.android.gms:play-services-location:$playServicesLocationVersion")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
