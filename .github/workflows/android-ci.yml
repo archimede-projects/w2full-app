@@ -9,6 +9,7 @@ on:
       - m4-mimit-csv
       - m4-eni-filter
       - m4-location-distance
+      - m4-nearby-stations-ui
   workflow_dispatch:
 
 permissions:
