@@ -7,23 +7,26 @@ on:
   workflow_call:
     inputs:
       release_tag:
-        description: Temporary bootstrap tag; empty on normal tag pushes
-        required: false
+        description: Temporary bootstrap tag; empty only on normal tag pushes
+        required: true
         type: string
-        default: ""
+    secrets:
+      W2FULL_DEBUG_KEYSTORE_BASE64:
+        required: true
+      W2FULL_DEBUG_KEYSTORE_PASSWORD:
+        required: true
+      W2FULL_DEBUG_KEY_ALIAS:
+        required: true
+      W2FULL_DEBUG_KEY_PASSWORD:
+        required: true
 
 permissions:
   contents: write
-
-concurrency:
-  group: android-release-${{ inputs.release_tag || github.ref }}
-  cancel-in-progress: false
 
 jobs:
   release-debug-apk:
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
       W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
       W2FULL_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEYSTORE_PASSWORD }}
       W2FULL_DEBUG_KEY_ALIAS: ${{ secrets.W2FULL_DEBUG_KEY_ALIAS }}
@@ -31,6 +34,21 @@ jobs:
       W2FULL_EXPECTED_CERT_SHA256: bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265
 
     steps:
+      - name: Resolve Release tag
+        shell: bash
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_RELEASE_TAG:-}" ]]; then
+            RELEASE_TAG="$INPUT_RELEASE_TAG"
+          else
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          fi
+          [[ "$RELEASE_TAG" == v* ]]
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "Release tag: $RELEASE_TAG"
+
       - name: Checkout tagged commit
         uses: actions/checkout@v7
         with:
