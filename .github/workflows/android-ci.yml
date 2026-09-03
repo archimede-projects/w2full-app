@@ -13,6 +13,7 @@ on:
       - m4-cache-sync
       - hotfix-device-validation
       - m4-vehicle-fuel-setting
+      - m4-integration-candidate
   workflow_dispatch:
 
 permissions:
