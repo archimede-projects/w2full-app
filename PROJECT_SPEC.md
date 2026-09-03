@@ -181,6 +181,8 @@ Confermata dall'utente il **3 settembre 2026** su `v0.4.5-preview.4`; l'intero c
 - ritorno a `Benzina` riflesso allo stesso modo senza refresh;
 - rifornimenti storici nel `Registro` rimasti invariati.
 
+Commit di chiusura funzionale: `cecb1c51b78554447b3c3a2348287ce596902be2`. CI di chiusura: run `33705034791`, job `100492229718`, **SUCCESS** con test JVM, build APK, verifica firma e upload artifact tutti riusciti.
+
 Il substep carburante veicolo è quindi chiuso. M4 complessiva resta **in corso** e non viene integrata su `main` in questo passaggio.
 
 ## 7. Requisito UX futuro già approvato — Indicazioni
@@ -210,7 +212,7 @@ Il bootstrap temporaneo usato per creare le prime preview resta debito infrastru
 ### 2026-09-03 — substep carburante veicolo verificato e chiuso
 - `v0.4.5-preview.4` verificata realmente sul Galaxy S25: intero checklist del selettore carburante passato.
 - Confermati cambio `Benzina` ↔ `Gasolio`, aggiornamento immediato dei prezzi Stazioni dalla cache senza refresh e invariabilità dei rifornimenti storici.
-- Evidenze automatiche: CI branch `33666445946` / `100369275395` e Release `33666875139` / `100370756041`, tutte **SUCCESS**.
+- Evidenze automatiche: CI branch `33666445946` / `100369275395`, Release `33666875139` / `100370756041` e CI di chiusura `33705034791` / `100492229718`, tutte **SUCCESS**.
 - Substep carburante veicolo dichiarato chiuso; issue #3 può essere chiusa come completata.
 - `main` resta invariato; M4 complessiva non è chiusa né integrata.
 - Cleanup distribuzione resta un checkpoint separato e non viene avviato qui.
