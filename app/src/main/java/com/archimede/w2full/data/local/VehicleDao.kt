@@ -19,4 +19,7 @@ interface VehicleDao {
 
     @Query("UPDATE vehicles SET tank_capacity_milliliters = :capacityMilliliters WHERE id = :vehicleId")
     suspend fun updateTankCapacity(vehicleId: Long, capacityMilliliters: Long?): Int
+
+    @Query("UPDATE vehicles SET default_fuel_type = :fuelType WHERE id = :vehicleId")
+    suspend fun updateDefaultFuelType(vehicleId: Long, fuelType: String): Int
 }
