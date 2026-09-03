@@ -27,7 +27,7 @@ W2Full è un'app Android nativa, gratuita e locale per un singolo veicolo V1: re
 - M1 — design: **[x]**
 - M2 — scaffold Android/CI/firma: **[x]**
 - M3 — registro rifornimenti/calcoli: **[x]**
-- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5 e hotfix device/prices verificati, substep carburante veicolo in corso; nulla integrato su `main`**
+- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5, hotfix device/prezzi e substep carburante veicolo verificati; nulla integrato su `main`**
 - M5 — storico prezzi + grafico: **[ ]**
 - M6 — notifiche soglia: **[ ]**
 - M7 — rifiniture: **[ ]**
@@ -111,9 +111,9 @@ Confermata dall'utente il **2 settembre 2026** su `v0.4.5-preview.3`:
 
 L'hotfix prezzi è chiuso. Commit di chiusura: `5a512fc5392835ea484b3c483df2cb10166a56e1`; CI di chiusura run `33665212254`, job `100365142376`, **SUCCESS**. Issue #2 chiusa come completata.
 
-## 6. Substep M4 corrente — carburante predefinito del veicolo
+## 6. Substep M4 — carburante predefinito del veicolo
 
-Stato: **[~] autorizzato il 2 settembre 2026; branch dedicato `m4-vehicle-fuel-setting`**. Issue di tracciamento: `#3 M4: configurare il carburante predefinito del veicolo`.
+Stato: **[x] implementato, CI verificato e confermato su Galaxy S25**. Branch dedicato `m4-vehicle-fuel-setting`. Issue di tracciamento: `#3 M4: configurare il carburante predefinito del veicolo`.
 
 ### 6.1 Scopo
 
@@ -145,7 +145,7 @@ Rendere modificabile dall'interfaccia il campo già esistente `VehicleEntity.def
 
 ### 6.5 Test obbligatori offline
 
-Prima della preview devono risultare verdi almeno:
+Risultati verdi prima della preview:
 - lista base disponibile con cache vuota;
 - opzioni MIMIT distinte aggiunte e deduplicate case/whitespace-insensitive;
 - valore corrente non presente nella cache resta selezionabile;
@@ -153,14 +153,35 @@ Prima della preview devono risultare verdi almeno:
 - errore/update a zero righe gestito senza crash;
 - cambio da `Benzina` a un altro carburante riflesso nello snapshot Stazioni usando la stessa cache prezzi, senza refresh rete;
 - nessuna modifica ai record rifornimento;
-- tutti i test M3/M4 precedenti continuano a passare.
+- regressione M3/M4 precedente verde.
 
-### 6.6 Versione e verifica
+### 6.6 Implementazione, CI e Release
 
-- Incrementare `versionCode` rispetto a preview.3; `versionName` resta nella linea M4 preview/hotfix.
-- CI branch obbligatorio: `testDebugUnitTest`, `assembleDebug`, `apksigner`, certificato persistente atteso.
-- Se verde, pubblicare una nuova GitHub Release preview installabile sopra `v0.4.5-preview.3` e richiedere verifica reale sul Galaxy S25.
-- Nessuna integrazione su `main` e nessuna chiusura M4 prima della conferma utente.
+- Spec preventiva: `00860e6b1f0bd04e194c91152e91b320a09e52ac`.
+- Implementazione: `1b865d7109c3e4bbae89539b68fcd5ceba4add33`.
+- Abilitazione del solo branch corrente nella whitelist CI: `26f3be8404354c02d6e4c61f917c6a6f99b8fe16`.
+- Versione applicativa: `versionCode = 5`, `versionName = 0.3.2-m4-fuel-setting`.
+- CI branch: run `33666445946`, job `100369275395`, **SUCCESS**.
+- `testDebugUnitTest`: **SUCCESS**; `assembleDebug`: **SUCCESS**.
+- Firma APK v2 verificata con certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
+- Artifact CI interno `9860822663`, ZIP SHA-256 `0f423a359bad8f65e4d587920fe288f3f6fe0b728a4e25708c6bf3d11b05c813`.
+- Release bootstrap commit `3d077d90c71eb42b362ed146d6eed3dfa9bd0eb0`.
+- Tag annotato `v0.4.5-preview.4` punta esattamente al commit `3d077d90c71eb42b362ed146d6eed3dfa9bd0eb0`.
+- Run Release `33666875139`; job tag `100370699858`: **SUCCESS**; job release `100370756041`: **SUCCESS**.
+- Asset Release `w2full-v0.4.5-preview.4-debug.apk`, SHA-256 `c4aa826ca43db344be862f6509d6664d657223dde386ac3bb3518189b49b6c7d`.
+
+### 6.7 Verifica reale Galaxy S25
+
+Confermata dall'utente il **3 settembre 2026** su `v0.4.5-preview.4`; l'intero checklist richiesto è passato:
+- upgrade installato sopra `v0.4.5-preview.3` senza disinstallazione;
+- bottom navigation `Registro | Stazioni | Veicolo` disponibile;
+- schermata `Veicolo` mostra carburante corrente e opzioni previste;
+- cambio a `Gasolio` persistito con feedback;
+- tornando a `Stazioni` senza refresh MIMIT, il carburante e i prezzi riflettono immediatamente `Gasolio` usando la cache esistente;
+- ritorno a `Benzina` riflesso allo stesso modo senza refresh;
+- rifornimenti storici nel `Registro` rimasti invariati.
+
+Il substep carburante veicolo è quindi chiuso. M4 complessiva resta **in corso** e non viene integrata su `main` in questo passaggio.
 
 ## 7. Requisito UX futuro già approvato — Indicazioni
 
@@ -185,6 +206,14 @@ Il bootstrap temporaneo usato per creare le prime preview resta debito infrastru
 - schema CSV M7.
 
 ## 10. Changelog corrente
+
+### 2026-09-03 — substep carburante veicolo verificato e chiuso
+- `v0.4.5-preview.4` verificata realmente sul Galaxy S25: intero checklist del selettore carburante passato.
+- Confermati cambio `Benzina` ↔ `Gasolio`, aggiornamento immediato dei prezzi Stazioni dalla cache senza refresh e invariabilità dei rifornimenti storici.
+- Evidenze automatiche: CI branch `33666445946` / `100369275395` e Release `33666875139` / `100370756041`, tutte **SUCCESS**.
+- Substep carburante veicolo dichiarato chiuso; issue #3 può essere chiusa come completata.
+- `main` resta invariato; M4 complessiva non è chiusa né integrata.
+- Cleanup distribuzione resta un checkpoint separato e non viene avviato qui.
 
 ### 2026-09-02 — substep carburante veicolo autorizzato
 - `v0.4.5-preview.3` verificata sul Galaxy S25 e hotfix prezzi chiuso formalmente.
