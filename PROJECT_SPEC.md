@@ -27,7 +27,7 @@ W2Full è un'app Android nativa, gratuita e locale per un singolo veicolo V1: re
 - M1 — design: **[x]**
 - M2 — scaffold Android/CI/firma: **[x]**
 - M3 — registro rifornimenti/calcoli: **[x]**
-- M4 — integrazione MIMIT: **[~] in corso; M4.1–M4.5, hotfix device/prezzi e substep carburante veicolo verificati; nulla integrato su `main`**
+- M4 — integrazione MIMIT: **[~] integration candidate autorizzato; M4.1–M4.5, hotfix device/prezzi e substep carburante veicolo verificati; nulla integrato su `main`**
 - M5 — storico prezzi + grafico: **[ ]**
 - M6 — notifiche soglia: **[ ]**
 - M7 — rifiniture: **[ ]**
@@ -224,3 +224,17 @@ Il bootstrap temporaneo usato per creare le prime preview resta debito infrastru
 - Opzioni base + descrizioni carburante distinte dalla cache MIMIT; cambio riflesso in Stazioni usando la cache esistente.
 - Issue #3 aperta per il substep.
 - `main` resta invariato; distribuzione cleanup e integrazione M4 restano separati.
+
+## 11. M4 integration candidate — autorizzato 2026-09-03
+
+Stato: **[~] in preparazione sul branch `m4-integration-candidate`**. Issue di tracciamento: `#4 M4: integration candidate e release RC`.
+
+- Base esatta: closure head `48d2305fcd9393fedcf047decae96441759a8655`; confronto con `main` (`749f9e44646113fb0c115c9a6685c73beee00b77`) = **ahead di 75 commit, behind 0**, merge-base esattamente `main`.
+- Nessuna nuova funzionalità deve essere introdotta: il candidato consolida esclusivamente quanto già implementato e verificato in M4.1–M4.5, hotfix device/prezzi e selettore carburante.
+- `main` resta invariato fino al test reale del candidato RC sul Galaxy S25.
+- Il cleanup del bootstrap/pipeline distribuzione resta separato e non fa parte del candidato M4.
+- Versioning candidato: incrementare a `versionCode = 6`, `versionName = 0.4.0-rc1`.
+- Abilitare esclusivamente `m4-integration-candidate` nella whitelist del workflow Android CI, senza aggiornare action/versioni o warning di manutenzione.
+- Verifica obbligatoria: intera suite `testDebugUnitTest`, `assembleDebug`, `apksigner` con certificato persistente atteso e artifact tecnico interno.
+- Se CI verde, pubblicare una Release prerelease taggata `v0.4.0-rc1`, installabile sopra `v0.4.5-preview.4`; il workflow Release deve ripetere test/build/firma sul commit taggato.
+- Dopo pubblicazione, fermarsi per test reale sul Galaxy S25. Solo dopo conferma utente potrà essere autorizzato il fast-forward di `main` e la chiusura complessiva di M4.
