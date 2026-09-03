@@ -3,14 +3,14 @@ name: Bootstrap Preview Release
 on:
   push:
     branches:
-      - m4-vehicle-fuel-setting
+      - m4-integration-candidate
 
 permissions:
   contents: write
 
 jobs:
   create-preview-tag:
-    if: "${{ github.event.head_commit.message == 'chore(release): bootstrap v0.4.5-preview.4' }}"
+    if: "${{ github.event.head_commit.message == 'chore(release): bootstrap v0.4.0-rc1' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout bootstrap commit
@@ -21,7 +21,7 @@ jobs:
       - name: Create one-time preview tag
         shell: bash
         env:
-          TAG: v0.4.5-preview.4
+          TAG: v0.4.0-rc1
         run: |
           set -euo pipefail
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
@@ -30,7 +30,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "W2Full M4 vehicle fuel setting preview" "$GITHUB_SHA"
+          git tag -a "$TAG" -m "W2Full M4 integration candidate RC1" "$GITHUB_SHA"
           git push origin "refs/tags/$TAG"
           echo "Created $TAG at $GITHUB_SHA"
 
@@ -38,7 +38,7 @@ jobs:
     needs: create-preview-tag
     uses: ./.github/workflows/android-release.yml
     with:
-      release_tag: v0.4.5-preview.4
+      release_tag: v0.4.0-rc1
     secrets:
       W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
       W2FULL_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.W2FULL_DEBUG_KEYSTORE_PASSWORD }}
