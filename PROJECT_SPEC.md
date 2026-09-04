@@ -71,12 +71,12 @@ Workflow permanente richiesto:
 - APK distribuito esclusivamente come asset di una vera GitHub Release.
 
 Validazione obbligatoria prima dell'integrazione:
-- è ammesso un solo helper temporaneo sul branch di lavoro per creare automaticamente un tag di prova `v*`, necessario esclusivamente a validare il vero evento `push` del tag con gli strumenti disponibili;
-- l'helper non deve chiamare il workflow permanente tramite `workflow_call`: deve soltanto creare e pushare il tag;
-- la Release di prova deve essere generata dal workflow permanente tramite il vero trigger `push.tags: v*`;
-- test, build, firma, certificato/public key, APK versionato, SHA-256 e pubblicazione Release devono risultare tutti verdi;
-- l'helper temporaneo deve essere rimosso dal branch prima dell'integrazione;
-- `.github/workflows/bootstrap-preview-release.yml` non deve risultare presente nel tree finale di `main`;
+- è ammesso un solo helper temporaneo sul branch di lavoro per creare automaticamente un tag di prova `v*` e avviare una singola validazione Release;
+- GitHub sopprime i workflow secondari generati da un tag pushato con il `GITHUB_TOKEN`; per questo, e solo durante la validazione, `android-release.yml` può esporre temporaneamente `workflow_call` con un input `release_tag`;
+- l'helper deve creare il tag annotato di prova e poi chiamare lo stesso job Release tramite il `workflow_call` temporaneo, forzando il checkout del tag appena creato;
+- test, build, firma, certificato/public key, APK versionato, SHA-256 e pubblicazione di una vera GitHub Release devono risultare tutti verdi;
+- dopo la validazione, l'helper temporaneo deve essere eliminato e `workflow_call`/input temporanei devono essere rimossi prima dell'integrazione;
+- il tree finale di `main` deve contenere soltanto `android-release.yml` con trigger `push.tags: v*` e non deve contenere `.github/workflows/bootstrap-preview-release.yml` né altri bootstrap di Release;
 - dopo l'integrazione su `main`, deve risultare verde anche la CI Android ordinaria sul commit integrato;
 - il checkpoint non è chiuso finché `PROJECT_SPEC.md` non registra commit, run/job e SHA-256 finali realmente verificati.
 
