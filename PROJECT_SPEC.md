@@ -9,7 +9,7 @@
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **in corso**.
 - M7.1 — filtri/ordinamento Stazioni: **[x] chiusa e verificata sul Galaxy S25**.
-- M7.2 — preferiti stazioni: **[~] RC1 FAIL su Galaxy S25; correzione UX implementata e primo gate CI verde**.
+- M7.2 — preferiti stazioni: **[~] RC1 FAIL; correzione integrata su `main` con CI verde, RC2 reale da pubblicare/provare**.
 - M7.3 — grafico Storico configurabile multi-serie: **richiesta esplicita e contratto funzionale fissato; codice non iniziato finché M7.2 corretta non è chiusa/provata**.
 
 ## Evidenza reale M5 su dispositivo
@@ -64,7 +64,7 @@ Il 4 settembre 2026 l'utente ha installato/provato la RC sul Samsung Galaxy S25 
 
 ## M7.2 — stazioni preferite
 
-Stato: **[~] RC1 FAIL su Galaxy S25; correzione UX implementata e primo gate CI verde**.
+Stato: **[~] RC1 FAIL; correzione integrata su `main` con CI verde, RC2 reale da pubblicare/provare**.
 
 ### Implementazione RC1 non accettata
 
@@ -141,18 +141,45 @@ Pertanto RC1 è **FAIL funzionale su dispositivo** e M7.2 non è chiusa.
 - test dedicati aggiunti per toggle add/remove, preferita fuori raggio senza duplicati, intersezione preferite/storico e fallback della selezione;
 - CI ordinaria modificata esclusivamente per aggiungere `m7.2-favorites-correction` ai branch trigger; nessuna versione/action CI aggiornata.
 
-### Primo gate CI correzione M7.2
+### Gate CI branch correzione M7.2
 
-- HEAD candidato `61b9ced82e84ff92de51c31d12af940a0fcacf2c` — `ci(m7.2): validate favorites correction branch`;
+- HEAD primo candidato `61b9ced82e84ff92de51c31d12af940a0fcacf2c` — `ci(m7.2): validate favorites correction branch`;
 - Android CI run `33905916130`, job `101130684120`: **SUCCESS** completa;
 - `testDebugUnitTest`: **SUCCESS**;
 - `assembleDebug`: **SUCCESS**;
 - `apksigner`: **Verifies**, firma v2, un signer;
 - certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
 - public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- artifact `w2full-debug-apk`, ID `9949506252`, size archivio `14291773` byte, digest ZIP SHA-256 `05640019d0d5f9f5a5c73c399d9ab73e6fe2b7b47f23b4078784181363bccd1e`.
+- artifact `w2full-debug-apk`, ID `9949506252`, size archivio `14291773` byte, digest ZIP SHA-256 `05640019d0d5f9f5a5c73c399d9ab73e6fe2b7b47f23b4078784181363bccd1e`;
+- vero HEAD documentato branch `33cb521d58120ce425a4aea06d49fb4e9eddb2d4`;
+- Android CI run `33906280194`, job `101131852025`: **SUCCESS** completa.
 
-Prima del PR deve essere verde anche la CI sul vero HEAD che contiene queste evidenze documentali.
+### Integrazione `main` correzione M7.2
+
+- PR `#9` — `fix(m7.2): move favorites to station cards`;
+- PR verificato mergeable, 10 file modificati e HEAD bloccato a `33cb521d58120ce425a4aea06d49fb4e9eddb2d4`;
+- merge **squash**;
+- commit integrato `a0646b4e86f18d8c03ca2e15d96893178b105212`;
+- Android CI reale di integrazione run `33906548734`, job `101132707262`: **SUCCESS** completa;
+- test JVM, build debug APK, verifica firma persistente e upload artifact: tutti **SUCCESS**.
+
+### Piano Release RC2 autorizzato
+
+Obiettivo: produrre una vera GitHub prerelease `v0.5.2-m7.2-rc2`, installabile sopra la RC1 sul Galaxy S25 e costruita dall'esatto HEAD finale di `main` che contiene questo piano dopo relativa CI verde.
+
+Il connettore GitHub disponibile non espone una mutazione diretta per creare un tag. È quindi autorizzato **solo per RC2** un bridge temporaneo sul branch dedicato `m7.2-release-rc2`:
+- il branch nasce dall'esatto HEAD `main` pre-Release dopo CI verde;
+- `main` e il suo workflow permanente `.github/workflows/android-release.yml` non vengono modificati dal bridge;
+- sul solo branch temporaneo il workflow Release può ricevere un unico trigger push del branch oltre al comportamento tag;
+- il bridge deve forzare checkout e `target_commitish` all'esatto SHA `main` pre-Release e verificare con `git rev-parse HEAD` lo SHA sorgente;
+- il job deve eseguire `testDebugUnitTest`, `assembleDebug`, verifica certificato/public key persistenti, creare il tag `v0.5.2-m7.2-rc2` e pubblicare l'APK reale in GitHub Releases;
+- il tag creato deve puntare direttamente all'esatto SHA `main` pre-Release, non al commit temporaneo del bridge;
+- Release/asset/tag/firma/SHA-256 devono essere verificati prima di considerare RC2 pronta;
+- dopo SUCCESS il branch bridge viene riallineato all'HEAD finale `main`, così il trigger temporaneo scompare; non viene dichiarato cancellato;
+- nessuna modifica temporanea del bridge entra in `main`;
+- il workflow Release permanente di `main` resta esclusivamente tag `v*`.
+
+M7.2 resta aperta finché RC2 non è realmente pubblicata/verificata e non riceve una nuova prova reale sul Galaxy S25.
 
 ## M7.3 — grafico Storico configurabile dall'utente
 
