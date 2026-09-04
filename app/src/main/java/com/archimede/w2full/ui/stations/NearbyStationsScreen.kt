@@ -60,6 +60,7 @@ fun NearbyStationsRoute() {
         NearbyStationsViewModel.Factory(
             repository = application.nearbyStationsRepository,
             preferencesStore = application.stationListPreferencesStore,
+            favoriteStationsStore = application.historyFavoriteStationsStore,
         )
     }
     val viewModel: NearbyStationsViewModel = viewModel(factory = factory)
@@ -94,6 +95,7 @@ fun NearbyStationsRoute() {
         onRadiusInputChanged = viewModel::onRadiusInputChanged,
         onApplyRadius = viewModel::applyRadiusInput,
         onSortModeChanged = viewModel::setSortMode,
+        onFavoriteToggle = viewModel::toggleFavorite,
     )
 }
 
@@ -107,6 +109,7 @@ private fun NearbyStationsScreen(
     onRadiusInputChanged: (String) -> Unit,
     onApplyRadius: () -> Unit,
     onSortModeChanged: (StationSortMode) -> Unit,
+    onFavoriteToggle: (Long) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -181,14 +184,46 @@ private fun NearbyStationsScreen(
             }
         }
 
+        if (state.favoriteStations.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Preferite",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            items(
+                items = state.favoriteStations,
+                key = { "favorite-${it.station.id}" },
+            ) { item ->
+                StationCard(
+                    item = item,
+                    selectedFuelType = state.selectedFuelType,
+                    price = state.pricesByStationId[item.station.id],
+                    isFavorite = true,
+                    onFavoriteToggle = onFavoriteToggle,
+                )
+            }
+            item {
+                Text(
+                    text = "Altre stazioni",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
         if (state.stations.isEmpty() && !state.isLoading && state.errorMessage == null) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = if (state.totalStationCount > 0 && state.radiusEnabled) {
-                            "Nessuna stazione Eni entro il raggio impostato."
-                        } else {
-                            "Nessuna stazione Eni disponibile."
+                        text = when {
+                            state.favoriteStations.isNotEmpty() ->
+                                "Nessun'altra stazione Eni nel filtro corrente."
+                            state.totalStationCount > 0 && state.radiusEnabled ->
+                                "Nessuna stazione Eni entro il raggio impostato."
+                            else ->
+                                "Nessuna stazione Eni disponibile."
                         },
                         modifier = Modifier.padding(14.dp),
                     )
@@ -203,6 +238,8 @@ private fun NearbyStationsScreen(
                     item = item,
                     selectedFuelType = state.selectedFuelType,
                     price = state.pricesByStationId[item.station.id],
+                    isFavorite = false,
+                    onFavoriteToggle = onFavoriteToggle,
                 )
             }
         }
@@ -397,7 +434,7 @@ private fun StationFiltersCard(
             }
 
             Text(
-                text = "Mostrate ${state.stations.size} di ${state.totalStationCount} stazioni · ${state.selectedFuelType}",
+                text = "Nel filtro ${state.filteredStationCount} di ${state.totalStationCount} stazioni · ${state.favoriteStations.size} preferite · ${state.selectedFuelType}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -424,6 +461,8 @@ private fun StationCard(
     item: MimitStationDistance,
     selectedFuelType: String,
     price: MimitStationFuelPrice?,
+    isFavorite: Boolean,
+    onFavoriteToggle: (Long) -> Unit,
 ) {
     val station = item.station
     val title = station.name.ifBlank { "Stazione Eni #${station.id}" }
@@ -445,6 +484,9 @@ private fun StationCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
+            TextButton(onClick = { onFavoriteToggle(station.id) }) {
+                Text(if (isFavorite) "★ Preferita" else "☆ Aggiungi ai preferiti")
+            }
             Text(
                 text = selectedFuelType,
                 style = MaterialTheme.typography.labelLarge,

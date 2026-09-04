@@ -37,6 +37,8 @@ class PriceHistoryViewModel(
     )
     val uiState: StateFlow<PriceHistoryUiState> = _uiState.asStateFlow()
 
+    private var latestStationsWithHistory: List<PriceHistoryStation> = emptyList()
+    private var latestDefaultFuelType: String? = null
     private var fuelJob: Job? = null
     private var serviceJob: Job? = null
     private var seriesJob: Job? = null
@@ -48,21 +50,17 @@ class PriceHistoryViewModel(
                 repository.observeDefaultFuelType(),
             ) { stations, defaultFuel -> stations to defaultFuel }
                 .collectLatest { (stations, defaultFuel) ->
-                    val currentState = _uiState.value
-                    val resolvedStation = resolveHistoryStationSelection(
-                        currentStationId = currentState.selectedStationId,
-                        stations = stations,
-                        favoriteStationIds = currentState.favoriteStationIds,
-                    )
-
-                    _uiState.value = currentState.copy(
-                        stations = stations,
-                        selectedStationId = resolvedStation,
-                        defaultFuelType = defaultFuel,
-                    )
-                    observeFuelTypes(resolvedStation, defaultFuel)
+                    latestStationsWithHistory = stations
+                    latestDefaultFuelType = defaultFuel
+                    applyFavoriteStationFilter()
                 }
         }
+    }
+
+    fun reloadFavorites() {
+        val loadedFavorites = favoriteStationsStore.load()
+        _uiState.value = _uiState.value.copy(favoriteStationIds = loadedFavorites)
+        applyFavoriteStationFilter()
     }
 
     fun selectStation(stationId: Long) {
@@ -76,17 +74,6 @@ class PriceHistoryViewModel(
             points = emptyList(),
         )
         observeFuelTypes(stationId, _uiState.value.defaultFuelType)
-    }
-
-    fun toggleFavorite(stationId: Long) {
-        val state = _uiState.value
-        if (state.stations.none { it.stationId == stationId }) return
-        val updatedFavorites = toggledHistoryFavoriteStationIds(
-            current = state.favoriteStationIds,
-            stationId = stationId,
-        )
-        favoriteStationsStore.save(updatedFavorites)
-        _uiState.value = state.copy(favoriteStationIds = updatedFavorites)
     }
 
     fun selectFuelType(fuelType: String) {
@@ -111,6 +98,32 @@ class PriceHistoryViewModel(
             points = emptyList(),
         )
         observeSeries(stationId, fuelType, isSelf)
+    }
+
+    private fun applyFavoriteStationFilter() {
+        val currentState = _uiState.value
+        val favoriteStations = historyStationsForFavorites(
+            stations = latestStationsWithHistory,
+            favoriteStationIds = currentState.favoriteStationIds,
+        )
+        val resolvedStation = resolveHistoryStationSelection(
+            currentStationId = currentState.selectedStationId,
+            stations = favoriteStations,
+            favoriteStationIds = currentState.favoriteStationIds,
+        )
+        val stationChanged = resolvedStation != currentState.selectedStationId
+
+        _uiState.value = currentState.copy(
+            stations = favoriteStations,
+            selectedStationId = resolvedStation,
+            defaultFuelType = latestDefaultFuelType,
+            fuelTypes = if (stationChanged) emptyList() else currentState.fuelTypes,
+            selectedFuelType = if (stationChanged) null else currentState.selectedFuelType,
+            serviceModes = if (stationChanged) emptyList() else currentState.serviceModes,
+            selectedIsSelf = if (stationChanged) null else currentState.selectedIsSelf,
+            points = if (stationChanged) emptyList() else currentState.points,
+        )
+        observeFuelTypes(resolvedStation, latestDefaultFuelType)
     }
 
     private fun observeFuelTypes(stationId: Long?, defaultFuelType: String?) {

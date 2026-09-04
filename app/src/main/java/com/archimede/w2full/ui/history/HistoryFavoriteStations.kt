@@ -32,6 +32,18 @@ class SharedPreferencesHistoryFavoriteStationsStore(
     }
 }
 
+class InMemoryHistoryFavoriteStationsStore(
+    initialStationIds: Set<Long> = emptySet(),
+) : HistoryFavoriteStationsStore {
+    private var stationIds: Set<Long> = initialStationIds.toSet()
+
+    override fun load(): Set<Long> = stationIds.toSet()
+
+    override fun save(stationIds: Set<Long>) {
+        this.stationIds = stationIds.toSet()
+    }
+}
+
 internal data class HistoryStationGroups(
     val favorites: List<PriceHistoryStation>,
     val others: List<PriceHistoryStation>,
@@ -44,6 +56,11 @@ internal fun groupHistoryStations(
     favorites = stations.filter { it.stationId in favoriteStationIds },
     others = stations.filterNot { it.stationId in favoriteStationIds },
 )
+
+internal fun historyStationsForFavorites(
+    stations: List<PriceHistoryStation>,
+    favoriteStationIds: Set<Long>,
+): List<PriceHistoryStation> = stations.filter { it.stationId in favoriteStationIds }
 
 internal fun resolveHistoryStationSelection(
     currentStationId: Long?,

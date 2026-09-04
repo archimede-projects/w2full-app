@@ -15,6 +15,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -46,10 +47,13 @@ fun PriceHistoryRoute() {
     val viewModel: PriceHistoryViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(viewModel) {
+        viewModel.reloadFavorites()
+    }
+
     PriceHistoryScreen(
         state = state,
         onStationSelected = viewModel::selectStation,
-        onFavoriteToggle = viewModel::toggleFavorite,
         onFuelSelected = viewModel::selectFuelType,
         onServiceSelected = viewModel::selectServiceMode,
     )
@@ -59,14 +63,10 @@ fun PriceHistoryRoute() {
 private fun PriceHistoryScreen(
     state: PriceHistoryUiState,
     onStationSelected: (Long) -> Unit,
-    onFavoriteToggle: (Long) -> Unit,
     onFuelSelected: (String) -> Unit,
     onServiceSelected: (Boolean) -> Unit,
 ) {
     val selectedStation = state.stations.firstOrNull { it.stationId == state.selectedStationId }
-    val stationGroups = remember(state.stations, state.favoriteStationIds) {
-        groupHistoryStations(state.stations, state.favoriteStationIds)
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -96,7 +96,7 @@ private fun PriceHistoryScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "Nessuno storico disponibile. Esegui almeno un aggiornamento MIMIT dalla schermata Stazioni.",
+                        text = "Nessuna stazione preferita con storico. Aggiungi una preferita dalla schermata Stazioni e aggiorna i dati MIMIT se necessario.",
                         modifier = Modifier.padding(16.dp),
                     )
                 }
@@ -107,8 +107,7 @@ private fun PriceHistoryScreen(
         item {
             HistoryFilterSection(title = "Stazione") {
                 HistoryStationSelector(
-                    groups = stationGroups,
-                    favoriteStationIds = state.favoriteStationIds,
+                    stations = state.stations,
                     selectedStationId = state.selectedStationId,
                     onStationSelected = onStationSelected,
                 )
@@ -123,16 +122,6 @@ private fun PriceHistoryScreen(
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            item {
-                val isFavorite = station.stationId in state.favoriteStationIds
-                FilterChip(
-                    selected = isFavorite,
-                    onClick = { onFavoriteToggle(station.stationId) },
-                    label = {
-                        Text(if (isFavorite) "★ Preferita" else "☆ Aggiungi ai preferiti")
-                    },
                 )
             }
         }
@@ -196,52 +185,7 @@ private fun PriceHistoryScreen(
 
 @Composable
 private fun HistoryStationSelector(
-    groups: HistoryStationGroups,
-    favoriteStationIds: Set<Long>,
-    selectedStationId: Long?,
-    onStationSelected: (Long) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (groups.favorites.isNotEmpty()) {
-            Text(
-                text = "Preferite",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HistoryStationChipRow(
-                stations = groups.favorites,
-                favoriteStationIds = favoriteStationIds,
-                selectedStationId = selectedStationId,
-                onStationSelected = onStationSelected,
-            )
-            if (groups.others.isNotEmpty()) {
-                Text(
-                    text = "Altre stazioni",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                HistoryStationChipRow(
-                    stations = groups.others,
-                    favoriteStationIds = favoriteStationIds,
-                    selectedStationId = selectedStationId,
-                    onStationSelected = onStationSelected,
-                )
-            }
-        } else {
-            HistoryStationChipRow(
-                stations = groups.others,
-                favoriteStationIds = favoriteStationIds,
-                selectedStationId = selectedStationId,
-                onStationSelected = onStationSelected,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HistoryStationChipRow(
     stations: List<PriceHistoryStation>,
-    favoriteStationIds: Set<Long>,
     selectedStationId: Long?,
     onStationSelected: (Long) -> Unit,
 ) {
@@ -251,15 +195,7 @@ private fun HistoryStationChipRow(
             FilterChip(
                 selected = station.stationId == selectedStationId,
                 onClick = { onStationSelected(station.stationId) },
-                label = {
-                    Text(
-                        if (station.stationId in favoriteStationIds) {
-                            "★ $stationLabel"
-                        } else {
-                            stationLabel
-                        },
-                    )
-                },
+                label = { Text(stationLabel) },
             )
         }
     }
