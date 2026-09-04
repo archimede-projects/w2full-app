@@ -9,7 +9,7 @@
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **in corso**.
 - M7.1 — filtri/ordinamento Stazioni: **[x] chiusa e verificata sul Galaxy S25**.
-- M7.2 — preferiti stazioni: **[~] RC1 FAIL su Galaxy S25; correzione UX autorizzata e fissata spec-first**.
+- M7.2 — preferiti stazioni: **[~] RC1 FAIL su Galaxy S25; correzione UX implementata e primo gate CI verde**.
 - M7.3 — grafico Storico configurabile multi-serie: **richiesta esplicita e contratto funzionale fissato; codice non iniziato finché M7.2 corretta non è chiusa/provata**.
 
 ## Evidenza reale M5 su dispositivo
@@ -64,7 +64,7 @@ Il 4 settembre 2026 l'utente ha installato/provato la RC sul Samsung Galaxy S25 
 
 ## M7.2 — stazioni preferite
 
-Stato: **[~] RC1 FAIL su Galaxy S25; correzione UX attiva**.
+Stato: **[~] RC1 FAIL su Galaxy S25; correzione UX implementata e primo gate CI verde**.
 
 ### Implementazione RC1 non accettata
 
@@ -100,6 +100,7 @@ Pertanto RC1 è **FAIL funzionale su dispositivo** e M7.2 non è chiusa.
 ### Contratto correttivo M7.2 — fonte di verità
 
 - branch correttivo `m7.2-favorites-correction`, derivato da `main` `d65ba4ddce9432caa0afc640c62d24b9843c043e`;
+- contratto correttivo spec-first commit `1138d5a76d9556843d3ba4113d16de7aae1c1097`;
 - la gestione preferiti viene spostata nella schermata `Stazioni`, non nello `Storico`;
 - ogni card stazione nella schermata `Stazioni` deve avere un controllo stella direttamente visibile e accessibile: stato non preferito `☆`, stato preferito `★`;
 - un singolo tap sulla stella deve aggiungere/rimuovere immediatamente la stazione dai preferiti e persistere la scelta localmente;
@@ -128,6 +129,30 @@ Pertanto RC1 è **FAIL funzionale su dispositivo** e M7.2 non è chiusa.
 - regression test M3–M7.1 e M5 storico tutti verdi;
 - CI branch reale con `testDebugUnitTest`, `assembleDebug`, verifica firma persistente e artifact **SUCCESS**;
 - prima della nuova prova Galaxy S25: PR/integration su `main`, CI `main` **SUCCESS**, Release RC2 reale con firma/hash verificati.
+
+### Implementazione correttiva M7.2
+
+- storage RC1 mantenuto compatibile usando lo stesso `SharedPreferences`/key per gli ID stazione;
+- `NearbyStationsViewModel` carica e persiste gli ID preferiti e separa la presentazione in `Preferite` e lista normale filtrata, senza duplicati;
+- una preferita fuori dal raggio corrente resta visibile nella sezione `Preferite` per consentirne la rimozione;
+- `NearbyStationsScreen` espone il controllo `☆ Aggiungi ai preferiti` / `★ Preferita` direttamente sulla card;
+- `PriceHistoryViewModel` limita il selettore alle sole stazioni preferite che possiedono storico;
+- `PriceHistoryScreen` non contiene più toggle preferiti né gruppo `Altre stazioni`; in assenza di preferite con storico mostra uno stato vuoto esplicito;
+- test dedicati aggiunti per toggle add/remove, preferita fuori raggio senza duplicati, intersezione preferite/storico e fallback della selezione;
+- CI ordinaria modificata esclusivamente per aggiungere `m7.2-favorites-correction` ai branch trigger; nessuna versione/action CI aggiornata.
+
+### Primo gate CI correzione M7.2
+
+- HEAD candidato `61b9ced82e84ff92de51c31d12af940a0fcacf2c` — `ci(m7.2): validate favorites correction branch`;
+- Android CI run `33905916130`, job `101130684120`: **SUCCESS** completa;
+- `testDebugUnitTest`: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- `apksigner`: **Verifies**, firma v2, un signer;
+- certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact `w2full-debug-apk`, ID `9949506252`, size archivio `14291773` byte, digest ZIP SHA-256 `05640019d0d5f9f5a5c73c399d9ab73e6fe2b7b47f23b4078784181363bccd1e`.
+
+Prima del PR deve essere verde anche la CI sul vero HEAD che contiene queste evidenze documentali.
 
 ## M7.3 — grafico Storico configurabile dall'utente
 
