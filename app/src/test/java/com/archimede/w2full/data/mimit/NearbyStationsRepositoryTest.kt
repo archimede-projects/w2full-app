@@ -69,11 +69,49 @@ class NearbyStationsRepositoryTest {
         assertEquals(NEW_TIMESTAMP, (result as MimitRefreshResult.Success).lastSuccessfulUpdateEpochMillis)
         assertEquals(listOf(12345L), database.mimitCacheDao().getStations().map { it.stationId })
         assertEquals(listOf(12345L, 12345L), database.mimitCacheDao().getPrices().map { it.stationId })
+        assertEquals(2, database.mimitCacheDao().getPriceHistory().size)
         val state = requireNotNull(database.mimitCacheDao().getSyncState())
         assertEquals(NEW_TIMESTAMP, state.lastSuccessfulUpdateEpochMillis)
         assertEquals(LocalDate.of(2026, 9, 1).toEpochDay(), state.stationsExtractionEpochDay)
         assertEquals(LocalDate.of(2026, 9, 1).toEpochDay(), state.pricesExtractionEpochDay)
         assertTrue(logger.entries.isEmpty())
+    }
+
+    @Test
+    fun identicalRefreshDoesNotDuplicateHistoryAndNewCommunicationAppendsPoint() = runBlocking {
+        val repository = repository()
+
+        enqueueValidDatasets()
+        assertTrue(repository.refresh() is MimitRefreshResult.Success)
+        assertEquals(2, database.mimitCacheDao().getPriceHistory().size)
+
+        enqueueValidDatasets()
+        assertTrue(repository.refresh() is MimitRefreshResult.Success)
+        assertEquals(2, database.mimitCacheDao().getPriceHistory().size)
+
+        server.enqueue(csvResponse(resourceText("mimit/anagrafica_sample.csv")))
+        server.enqueue(
+            csvResponse(
+                """
+                Estrazione del 2026-09-02
+                idimpianto|descCarburante|prezzo|isSelf|dtComu
+                12345|Benzina|1.799|1|02/09/2026 07:45:12
+                12345|Gasolio|1.709|0|01/09/2026 20:10:00
+                12346|GPL|0.799|1|02/09/2026 06:00:00
+                """.trimIndent(),
+            ),
+        )
+
+        assertTrue(repository.refresh() is MimitRefreshResult.Success)
+        val history = database.mimitCacheDao().getPriceHistory()
+        assertEquals(4, history.size)
+        assertEquals(
+            listOf(1_789L, 1_799L),
+            history
+                .filter { it.stationId == 12345L && it.fuelDescription == "Benzina" && it.isSelf }
+                .sortedBy { it.communicatedAt }
+                .map { it.priceMilliEuroPerUnit },
+        )
     }
 
     @Test
@@ -103,6 +141,7 @@ class NearbyStationsRepositoryTest {
         assertTrue(result is MimitRefreshResult.Success)
         assertEquals(listOf(555L), database.mimitCacheDao().getStations().map { it.stationId })
         assertEquals("Agip Eni", database.mimitCacheDao().getStations().single().brand)
+        assertEquals(listOf(555L), database.mimitCacheDao().getPriceHistory().map { it.stationId })
     }
 
     @Test
@@ -303,6 +342,7 @@ class NearbyStationsRepositoryTest {
         assertEquals(listOf(999L), database.mimitCacheDao().getStations().map { it.stationId })
         assertEquals(listOf(999L), database.mimitCacheDao().getPrices().map { it.stationId })
         assertEquals(OLD_TIMESTAMP, database.mimitCacheDao().getSyncState()?.lastSuccessfulUpdateEpochMillis)
+        assertTrue(database.mimitCacheDao().getPriceHistory().isEmpty())
     }
 
     private fun enqueueValidDatasets() {
