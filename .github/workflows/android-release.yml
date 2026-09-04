@@ -4,6 +4,21 @@ on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Temporary one-time validation tag; absent on normal tag pushes
+        required: false
+        type: string
+    secrets:
+      W2FULL_DEBUG_KEYSTORE_BASE64:
+        required: true
+      W2FULL_DEBUG_KEYSTORE_PASSWORD:
+        required: true
+      W2FULL_DEBUG_KEY_ALIAS:
+        required: true
+      W2FULL_DEBUG_KEY_PASSWORD:
+        required: true
 
 permissions:
   contents: write
@@ -22,9 +37,15 @@ jobs:
     steps:
       - name: Resolve Release tag
         shell: bash
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          RELEASE_TAG="$GITHUB_REF_NAME"
+          if [[ -n "${INPUT_RELEASE_TAG:-}" ]]; then
+            RELEASE_TAG="$INPUT_RELEASE_TAG"
+          else
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          fi
           [[ "$RELEASE_TAG" == v* ]]
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
           echo "Release tag: $RELEASE_TAG"
@@ -32,7 +53,7 @@ jobs:
       - name: Checkout tagged commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
