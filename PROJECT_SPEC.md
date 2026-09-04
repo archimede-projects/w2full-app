@@ -6,7 +6,7 @@
 
 - M0–M4: **chiuse**.
 - Distribuzione GitHub Releases: **chiusa**.
-- M5 — storico prezzi + grafico: **in corso**.
+- M5 — storico prezzi + grafico: **in corso; candidato branch verificato, integrazione su `main` pendente**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **non iniziata**.
 
@@ -99,7 +99,7 @@ Validazione eseguita prima dell'integrazione:
 
 ## M5 — storico prezzi + grafico
 
-Stato: **[~] in corso**.
+Stato: **[~] candidato branch verificato; integrazione pendente**.
 
 ### Obiettivo
 
@@ -119,7 +119,7 @@ Conservare localmente, tra refresh MIMIT successivi, le osservazioni di prezzo d
 - UI: nuova destinazione bottom-nav `Storico`;
 - selezione iniziale: prima stazione Eni disponibile; carburante iniziale uguale al `defaultFuelType` del veicolo quando presente nello storico, altrimenti primo carburante disponibile; modalità iniziale `Self` quando disponibile, altrimenti `Servito`;
 - grafico lineare realizzato con `androidx.compose.foundation.Canvas`, senza dipendenze chart aggiuntive. Vico è stato rivalutato in M5 ma non introdotto: la linea 3.x corrente usa l'asse Compose Multiplatform/JetBrains, mentre W2Full resta sulla toolchain AndroidX Compose già verificata;
-- il grafico deve gestire 0, 1 o più punti senza crash: empty state esplicito, punto singolo visibile, più punti collegati in ordine cronologico;
+- il grafico gestisce 0, 1 o più punti: empty state esplicito, punto singolo centrato, più punti collegati in ordine cronologico e serie piatta sulla linea mediana;
 - sotto il grafico viene mostrato l'elenco cronologico inverso con data comunicazione e prezzo €/l;
 - `versionCode = 7`, `versionName = 0.5.0-m5`;
 - M6/M7 restano fuori scope.
@@ -133,6 +133,20 @@ Conservare localmente, tra refresh MIMIT successivi, le osservazioni di prezzo d
 - test puri della trasformazione serie grafico/empty-single-multiple;
 - CI branch reale con test JVM, `assembleDebug`, verifica firma persistente e artifact **SUCCESS**;
 - prima di chiudere M5: integrazione su `main`, CI reale su `main` **SUCCESS**, aggiornamento delle evidenze in questa spec e riallineamento branch M5 al commit finale.
+
+### Evidenze candidato branch M5
+
+- contratto M5 fissato prima del codice: commit `095c9659d57be37b103ce9d66afa7102f0e6930a`;
+- candidato verificato: commit `b09cd84bf39b0b40fcd830a50ad45f5d8922a397`;
+- CI branch reale run `33886894102`, job `101068776817`: **SUCCESS**;
+- `testDebugUnitTest`: **SUCCESS**, inclusi migrazione `1→3`/`2→3`, deduplica/query DAO, accumulo storico su refresh e regressioni M3/M4;
+- `assembleDebug`: **SUCCESS**;
+- firma persistente verificata da `apksigner`: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact CI `w2full-debug-apk`, ID `9942280190`, presente e non scaduto al momento della verifica;
+- digest SHA-256 dell'archivio artifact: `e65bc393b76bb7353eaafed2307de13cc878ea713f10f7808ae4d0c625d7304d`;
+- diff contro `main` limitato a implementazione/test/spec M5 più l'aggiunta del solo branch `m5-price-history` ai trigger della CI ordinaria.
+
+M5 resta aperta finché il candidato non è integrato su `main`, la CI reale del commit integrato non è verde e questa spec non registra le evidenze finali.
 
 ## Requisito futuro già approvato
 
