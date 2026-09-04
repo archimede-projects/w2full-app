@@ -124,8 +124,24 @@ class PriceHistoryViewModel(
     }
 
     fun reloadFavorites() {
-        _uiState.value = _uiState.value.copy(favoriteStationIds = favoriteStationsStore.load())
+        preferences = preferencesStore.load()
+        _uiState.value = _uiState.value.copy(
+            favoriteStationIds = favoriteStationsStore.load(),
+            stationScope = preferences.stationScope,
+            seriesAFuelType = preferences.seriesAFuelType,
+            seriesAIsSelf = preferences.seriesAIsSelf,
+            seriesBEnabled = preferences.seriesBEnabled,
+            seriesBFuelType = preferences.seriesBFuelType,
+            seriesBIsSelf = preferences.seriesBIsSelf,
+            period = preferences.period,
+            showTable = preferences.showTable,
+        )
         applyStationScope()
+        val stationId = _uiState.value.selectedStationId
+        if (stationId != null) {
+            resetForStation(stationId)
+            observeFuelTypes(stationId)
+        }
     }
 
     fun setStationScope(scope: HistoryStationScope) {
