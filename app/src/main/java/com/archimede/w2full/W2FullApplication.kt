@@ -16,7 +16,9 @@ import com.archimede.w2full.data.repository.VehicleSettingsRepository
 import com.archimede.w2full.location.FusedUserLocationProvider
 import com.archimede.w2full.sync.MimitSyncScheduler
 import com.archimede.w2full.ui.history.HistoryFavoriteStationsStore
+import com.archimede.w2full.ui.history.HistoryPreferencesStore
 import com.archimede.w2full.ui.history.SharedPreferencesHistoryFavoriteStationsStore
+import com.archimede.w2full.ui.history.SharedPreferencesHistoryPreferencesStore
 import com.archimede.w2full.ui.stations.SharedPreferencesStationListPreferencesStore
 import com.archimede.w2full.ui.stations.StationListPreferencesStore
 
@@ -49,6 +51,10 @@ class W2FullApplication : Application() {
 
     val historyFavoriteStationsStore: HistoryFavoriteStationsStore by lazy {
         SharedPreferencesHistoryFavoriteStationsStore(this)
+    }
+
+    val historyPreferencesStore: HistoryPreferencesStore by lazy {
+        SharedPreferencesHistoryPreferencesStore(this)
     }
 
     val priceHistoryRepository: PriceHistoryRepository by lazy {
