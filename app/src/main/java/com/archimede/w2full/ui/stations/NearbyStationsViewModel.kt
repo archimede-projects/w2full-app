@@ -34,6 +34,7 @@ data class NearbyStationsUiState(
     val stations: List<MimitStationDistance> = emptyList(),
     val favoriteStations: List<MimitStationDistance> = emptyList(),
     val favoriteStationIds: Set<Long> = emptySet(),
+    val filteredStationCount: Int = 0,
     val totalStationCount: Int = 0,
     val locationStatus: NearbyLocationUiStatus? = null,
     val extractionDate: LocalDate? = null,
@@ -263,6 +264,7 @@ class NearbyStationsViewModel(
             stations = presentation.regular,
             favoriteStations = presentation.favorites,
             favoriteStationIds = favoriteStationIds,
+            filteredStationCount = displayedStations.size,
             totalStationCount = sourceStations.size,
         )
     }
