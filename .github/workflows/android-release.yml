@@ -4,27 +4,18 @@ on:
   push:
     tags:
       - "v*"
-  workflow_call:
-    inputs:
-      release_tag:
-        description: Temporary one-time validation tag; absent on normal tag pushes
-        required: false
-        type: string
-    secrets:
-      W2FULL_DEBUG_KEYSTORE_BASE64:
-        required: true
-      W2FULL_DEBUG_KEYSTORE_PASSWORD:
-        required: true
-      W2FULL_DEBUG_KEY_ALIAS:
-        required: true
-      W2FULL_DEBUG_KEY_PASSWORD:
-        required: true
+    branches:
+      - release-distribution-clean
 
 permissions:
   contents: write
 
 jobs:
   release-debug-apk:
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.ref == 'refs/heads/release-distribution-clean' &&
+       github.event.head_commit.message == 'chore(release): validate distribution workflow')
     runs-on: ubuntu-latest
     env:
       W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
@@ -35,25 +26,27 @@ jobs:
       W2FULL_EXPECTED_PUBLIC_KEY_SHA256: 90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313
 
     steps:
-      - name: Resolve Release tag
+      - name: Resolve Release tag and checkout ref
         shell: bash
-        env:
-          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          if [[ -n "${INPUT_RELEASE_TAG:-}" ]]; then
-            RELEASE_TAG="$INPUT_RELEASE_TAG"
+          if [[ "$GITHUB_REF" == "refs/heads/release-distribution-clean" ]]; then
+            RELEASE_TAG="v0.4.0-rc1-distcheck1"
+            CHECKOUT_REF="$GITHUB_SHA"
           else
             RELEASE_TAG="$GITHUB_REF_NAME"
+            CHECKOUT_REF="$GITHUB_REF"
           fi
           [[ "$RELEASE_TAG" == v* ]]
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "CHECKOUT_REF=$CHECKOUT_REF" >> "$GITHUB_ENV"
           echo "Release tag: $RELEASE_TAG"
+          echo "Checkout ref: $CHECKOUT_REF"
 
-      - name: Checkout tagged commit
+      - name: Checkout release commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -134,6 +127,7 @@ jobs:
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           name: W2Full ${{ env.RELEASE_TAG }}
           body: |
             W2Full debug — `${{ env.RELEASE_TAG }}`
