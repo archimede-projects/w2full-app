@@ -1,6 +1,6 @@
 # W2Full — Project Specification
 
-> **Fonte di verità del progetto.** Questa versione chiude M4 e apre esclusivamente il checkpoint infrastrutturale di distribuzione GitHub Releases, separato da M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
+> **Fonte di verità del progetto.** Questa versione chiude M4 e gestisce esclusivamente il checkpoint infrastrutturale di distribuzione GitHub Releases, separato da M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
 
 ## Stato
 
@@ -8,7 +8,7 @@
 - M5 — storico prezzi + grafico: **non iniziata**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **non iniziata**.
-- Distribuzione GitHub Releases: checkpoint infrastrutturale **in corso**, separato da M4/M5.
+- Distribuzione GitHub Releases: validazione branch **completata**, cleanup temporaneo **completato**, integrazione su `main` ancora da verificare.
 
 ## M4 — integrazione MIMIT chiusa
 
@@ -70,18 +70,24 @@ Workflow permanente richiesto:
 - calcolo SHA-256 dell'APK e pubblicazione del digest nel corpo della GitHub Release;
 - APK distribuito esclusivamente come asset di una vera GitHub Release.
 
-Validazione obbligatoria prima dell'integrazione:
-- per una sola corsa di validazione, lo stesso `.github/workflows/android-release.yml` può aggiungere temporaneamente il branch `release-distribution-clean` ai trigger `push`, con guardia su uno specifico commit di validazione;
-- in tale corsa il workflow deve usare il tag di prova `v0.4.0-rc1-distcheck1` e `target_commitish: ${{ github.sha }}` per creare il tag/Release sul commit realmente validato, senza bootstrap separati e senza `workflow_call`;
-- test, build, firma, certificato/public key, APK versionato, SHA-256 e pubblicazione di una vera GitHub Release devono risultare tutti verdi nello stesso workflow;
-- dopo la validazione, il trigger branch e ogni logica temporanea devono essere rimossi prima dell'integrazione;
-- il tree finale di `main` deve contenere soltanto `android-release.yml` con trigger `push.tags: v*` e non deve contenere `.github/workflows/bootstrap-preview-release.yml` né altri bootstrap di Release;
-- dopo l'integrazione su `main`, deve risultare verde anche la CI Android ordinaria sul commit integrato;
-- il checkpoint non è chiuso finché `PROJECT_SPEC.md` non registra commit, run/job e SHA-256 finali realmente verificati.
+Validazione prima dell'integrazione:
+- commit di validazione: `c3567b4b7afb7f37651784842460a41a94bc8efc` — `chore(release): validate distribution workflow`;
+- run `33884215157`, job `101059934737`: **SUCCESS**;
+- test JVM: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- certificato SHA-256 verificato: `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 verificata: `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- Release reale `v0.4.0-rc1-distcheck1`, prerelease, target commit `c3567b4b7afb7f37651784842460a41a94bc8efc`;
+- asset `w2full-v0.4.0-rc1-distcheck1-debug.apk`;
+- APK SHA-256 `616ea026b3d3e80ab7e7e865df624a7df088479f9ecc4838015d2b14f8d846ef`;
+- cleanup del trigger branch/logica temporanea: commit `985f70f5d8df01c7ea97e0d13856595f8ef18cf6` — `ci(release): finalize tag-only release workflow`;
+- tree branch dopo cleanup: presenti solo `android-ci.yml` e `android-release.yml`; nessun bootstrap Release.
+
+Il checkpoint resta aperto fino alla CI reale su `main` del commit integrato e al successivo commit documentale di chiusura.
 
 ## Isolamento distribuzione
 
-Fino alla chiusura del checkpoint, `main` resta privo del workflow Release permanente. M5 resta esplicitamente bloccata e non deve essere iniziata durante questo intervento.
+M5 resta esplicitamente bloccata durante questo intervento. `android-release.yml` può essere integrato su `main` solo dopo la validazione e il cleanup sopra documentati.
 
 ## Requisito futuro già approvato
 
