@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.archimede.w2full.ui.history.PriceHistoryRoute
 import com.archimede.w2full.ui.refueling.RefuelingRoute
 import com.archimede.w2full.ui.stations.NearbyStationsRoute
 import com.archimede.w2full.ui.vehicle.VehicleSettingsRoute
@@ -20,6 +21,7 @@ import com.archimede.w2full.ui.vehicle.VehicleSettingsRoute
 private enum class RootDestination {
     REFUELING,
     STATIONS,
+    HISTORY,
     VEHICLE,
 }
 
@@ -43,6 +45,12 @@ fun W2FullRoot() {
                     label = { Text("Stazioni") },
                 )
                 NavigationBarItem(
+                    selected = destination == RootDestination.HISTORY,
+                    onClick = { destination = RootDestination.HISTORY },
+                    icon = { Text("H") },
+                    label = { Text("Storico") },
+                )
+                NavigationBarItem(
                     selected = destination == RootDestination.VEHICLE,
                     onClick = { destination = RootDestination.VEHICLE },
                     icon = { Text("V") },
@@ -59,6 +67,7 @@ fun W2FullRoot() {
             when (destination) {
                 RootDestination.REFUELING -> RefuelingRoute()
                 RootDestination.STATIONS -> NearbyStationsRoute()
+                RootDestination.HISTORY -> PriceHistoryRoute()
                 RootDestination.VEHICLE -> VehicleSettingsRoute()
             }
         }
