@@ -4,18 +4,12 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - release-distribution-clean
 
 permissions:
   contents: write
 
 jobs:
   release-debug-apk:
-    if: >-
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.ref == 'refs/heads/release-distribution-clean' &&
-       github.event.head_commit.message == 'chore(release): validate distribution workflow')
     runs-on: ubuntu-latest
     env:
       W2FULL_DEBUG_KEYSTORE_BASE64: ${{ secrets.W2FULL_DEBUG_KEYSTORE_BASE64 }}
@@ -26,27 +20,19 @@ jobs:
       W2FULL_EXPECTED_PUBLIC_KEY_SHA256: 90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313
 
     steps:
-      - name: Resolve Release tag and checkout ref
+      - name: Resolve Release tag
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" == "refs/heads/release-distribution-clean" ]]; then
-            RELEASE_TAG="v0.4.0-rc1-distcheck1"
-            CHECKOUT_REF="$GITHUB_SHA"
-          else
-            RELEASE_TAG="$GITHUB_REF_NAME"
-            CHECKOUT_REF="$GITHUB_REF"
-          fi
+          RELEASE_TAG="$GITHUB_REF_NAME"
           [[ "$RELEASE_TAG" == v* ]]
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
-          echo "CHECKOUT_REF=$CHECKOUT_REF" >> "$GITHUB_ENV"
           echo "Release tag: $RELEASE_TAG"
-          echo "Checkout ref: $CHECKOUT_REF"
 
-      - name: Checkout release commit
+      - name: Checkout tagged commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.CHECKOUT_REF }}
+          ref: ${{ github.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
