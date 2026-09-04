@@ -1,6 +1,6 @@
 # W2Full — Project Specification
 
-> **Fonte di verità del progetto.** Questa versione chiude M4. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
+> **Fonte di verità del progetto.** Questa versione chiude M4 e gestisce esclusivamente il checkpoint infrastrutturale di distribuzione GitHub Releases, separato da M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
 
 ## Stato
 
@@ -8,7 +8,7 @@
 - M5 — storico prezzi + grafico: **non iniziata**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **non iniziata**.
-- Distribuzione GitHub Releases: intervento infrastrutturale **separato da M4**; il relativo cleanup resta aperto e non è stato integrato con questa milestone.
+- Distribuzione GitHub Releases: validazione branch **completata**, cleanup temporaneo **completato**, integrazione su `main` ancora da verificare.
 
 ## M4 — integrazione MIMIT chiusa
 
@@ -29,7 +29,7 @@ Contenuto M4 su `main`:
 - regression test M3/M4;
 - `versionCode = 6`, `versionName = 0.4.0-rc1`, corrispondenti al contenuto funzionale realmente provato.
 
-## Evidenze finali
+## Evidenze finali M4
 
 RC realmente provata:
 - Release `v0.4.0-rc1`;
@@ -47,14 +47,47 @@ Integrazione pulita:
 
 Certificato persistente atteso e verificato lungo M4: SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`; public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
 
+## Checkpoint distribuzione GitHub Releases — contratto di chiusura
+
+Questo intervento è esclusivamente infrastrutturale. Non introduce funzionalità M5 e non modifica comportamento, dati o UI dell'app.
+
+Base di lavoro:
+- branch pulito `release-distribution-clean` creato dall'HEAD di `main` `3abd465cd9f049bc45b552a68d174f3d83b75191`;
+- il vecchio branch divergente `release-distribution` non deve essere mergeato in `main`;
+- a chiusura, il checkpoint legacy deve essere riallineato al commit finale verificato, senza trascinare la sua vecchia storia nel merge funzionale.
+
+Workflow permanente richiesto:
+- unico file permanente da integrare: `.github/workflows/android-release.yml`;
+- trigger esclusivamente su `push` di tag `v*`;
+- nessun `workflow_call` permanente;
+- nessun `workflow_dispatch` per pubblicare APK;
+- checkout del commit realmente taggato;
+- test JVM `testDebugUnitTest` prima della build;
+- build `assembleDebug`;
+- uso obbligatorio del keystore debug persistente via secrets: se un secret di firma manca, la Release deve fallire;
+- verifica con `apksigner` del certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e della public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- APK versionato come `w2full-<tag>-debug.apk`;
+- calcolo SHA-256 dell'APK e pubblicazione del digest nel corpo della GitHub Release;
+- APK distribuito esclusivamente come asset di una vera GitHub Release.
+
+Validazione prima dell'integrazione:
+- commit di validazione: `c3567b4b7afb7f37651784842460a41a94bc8efc` — `chore(release): validate distribution workflow`;
+- run `33884215157`, job `101059934737`: **SUCCESS**;
+- test JVM: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- certificato SHA-256 verificato: `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 verificata: `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- Release reale `v0.4.0-rc1-distcheck1`, prerelease, target commit `c3567b4b7afb7f37651784842460a41a94bc8efc`;
+- asset `w2full-v0.4.0-rc1-distcheck1-debug.apk`;
+- APK SHA-256 `616ea026b3d3e80ab7e7e865df624a7df088479f9ecc4838015d2b14f8d846ef`;
+- cleanup del trigger branch/logica temporanea: commit `985f70f5d8df01c7ea97e0d13856595f8ef18cf6` — `ci(release): finalize tag-only release workflow`;
+- tree branch dopo cleanup: presenti solo `android-ci.yml` e `android-release.yml`; nessun bootstrap Release.
+
+Il checkpoint resta aperto fino alla CI reale su `main` del commit integrato e al successivo commit documentale di chiusura.
+
 ## Isolamento distribuzione
 
-Restano volutamente fuori da `main`:
-- `.github/workflows/android-release.yml`;
-- `.github/workflows/bootstrap-preview-release.yml`;
-- cleanup del bootstrap e rimozione di `workflow_call` temporaneo.
-
-Questo debito infrastrutturale resta un checkpoint separato e non modifica lo stato di chiusura funzionale di M4.
+M5 resta esplicitamente bloccata durante questo intervento. `android-release.yml` può essere integrato su `main` solo dopo la validazione e il cleanup sopra documentati.
 
 ## Requisito futuro già approvato
 
