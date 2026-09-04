@@ -8,7 +8,7 @@
 - Distribuzione GitHub Releases: **chiusa**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **in corso**.
-- M7.1 — filtri/ordinamento Stazioni: **integrata su `main`, CI verde; Release RC e prova Galaxy S25 pendenti**.
+- M7.1 — filtri/ordinamento Stazioni: **integrata e Release RC verificata; prova Galaxy S25 pendente**.
 - M7.2 — preferiti nello Storico: **richiesta e accodata; non iniziata finché M7.1 non è chiusa/provata**.
 
 ## Evidenza reale M5 su dispositivo
@@ -64,22 +64,32 @@
 - commit integrato `1c97cc65a570f6c9220005ffa9541687b8e86386`;
 - parent diretto `1eb6f5ab3b4a248e30e7a693ac0bc62ac311bffa`;
 - Android CI reale su `main`: run `33898139949`, job `101105588935`: **SUCCESS**;
-- test, build debug APK, verifica firma persistente e upload artifact: tutti **SUCCESS**.
+- test, build debug APK, verifica firma persistente e upload artifact: tutti **SUCCESS**;
+- commit documentale pre-Release `316eec016a5dd7d309a07d68c819b17a8e2fbe70`;
+- CI reale pre-Release run `33898389712`, job `101106388820`: **SUCCESS** completa.
 
-### Piano Release RC M7.1 autorizzato
+### Release RC M7.1 verificata
 
-Obiettivo: produrre un APK reale installabile sul Galaxy S25, tag `v0.5.1-m7.1-rc1`, costruito dal commit M7.1 finale di `main` dopo il commit documentale di pre-Release.
+Il connettore GitHub disponibile non espone una mutazione diretta per creare tag. Per questa sola RC è stato usato il bridge temporaneo autorizzato sul branch `m7.1-release-rc1`; nessuna modifica del bridge è entrata in `main`.
 
-Il connettore GitHub disponibile non espone una mutazione diretta per creare tag. È quindi autorizzato **solo per questa Release RC** un bridge temporaneo sul branch dedicato `m7.1-release-rc1`:
-- il branch nasce dall'HEAD `main` da rilasciare;
-- `android-release.yml` sul branch temporaneo riceve un unico trigger push del branch, oltre al comportamento tag, e forza checkout/`target_commitish` all'esatto SHA finale `main`;
-- la build deve eseguire test JVM, `assembleDebug`, verifica certificato/public key persistenti e pubblicare una vera GitHub Release prerelease `v0.5.1-m7.1-rc1`;
-- il tag creato dalla Release deve puntare direttamente allo SHA finale `main`;
-- dopo SUCCESS e verifica Release/tag/asset, il branch temporaneo viene riallineato all'HEAD `main`, rimuovendo ogni trigger temporaneo;
-- nessuna modifica temporanea del bridge entra in `main`;
-- il workflow permanente di `main` resta esclusivamente tag `v*`.
+Evidenze reali:
+- commit bridge `a040bc8aa1fbedb7ed6223d76a7b65e8a72c21c4` — `chore(release): publish M7.1 RC1 from final main`;
+- Android Release run `33898639201`, job `101107200806`: **SUCCESS**;
+- il workflow ha forzato checkout e `target_commitish` a `316eec016a5dd7d309a07d68c819b17a8e2fbe70` e ha verificato l'HEAD reale prima di test/build;
+- `testDebugUnitTest`: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- `apksigner`: **Verifies**, firma v2, un signer;
+- certificato SHA-256 verificato: `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 verificata: `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- Release reale prerelease `v0.5.1-m7.1-rc1`, Release ID `382893738`;
+- tag lightweight `v0.5.1-m7.1-rc1` → commit diretto `316eec016a5dd7d309a07d68c819b17a8e2fbe70`;
+- asset `w2full-v0.5.1-m7.1-rc1-debug.apk`, asset ID `544644724`, size `14864022` byte;
+- APK SHA-256 `3f5c8e138b7c3158d52026e3e135be15314d65fc3385a1dd932311cd36ba9a08`;
+- Release non draft, prerelease, pubblicata da `github-actions[bot]`.
 
-M7.1 resta aperta finché la Release reale non esiste, asset/firma/hash/tag non sono verificati, la spec non registra le evidenze e il Galaxy S25 non ha una build concreta da provare.
+Dopo la CI verde di questo aggiornamento documentale, il branch temporaneo `m7.1-release-rc1` deve essere riallineato al nuovo HEAD `main`; in tal modo il suo workflow torna identico al permanente tag-only di `main` e non rimane alcun trigger branch temporaneo.
+
+M7.1 resta aperta solo per la verifica reale sul Samsung Galaxy S25 della RC `v0.5.1-m7.1-rc1`. Dopo PASS utente verranno registrate la prova device e la chiusura M7.1; solo allora può iniziare M7.2.
 
 ## M7.2 — preferiti nello Storico — richiesta
 
@@ -91,4 +101,4 @@ M7: pulsante `Indicazioni` su ogni stazione tramite intent verso Google Maps/app
 
 ## Regola di avanzamento
 
-Un checkpoint alla volta. M7.1 è l'unico checkpoint attivo. M7.2 parte solo dopo chiusura e prova M7.1. M6 resta non iniziata finché non viene esplicitamente autorizzata come obiettivo attivo.
+Un checkpoint alla volta. M7.1 è l'unico checkpoint attivo e attende solo la prova RC sul Galaxy S25. M7.2 parte dopo chiusura/prova M7.1. M6 resta non iniziata finché non viene esplicitamente autorizzata come obiettivo attivo.
