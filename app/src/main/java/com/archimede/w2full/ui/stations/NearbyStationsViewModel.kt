@@ -118,7 +118,23 @@ class NearbyStationsViewModel(
     }
 
     fun loadIfNeeded() {
+        reloadLocalPreferences()
         if (!hasLoadedOnce) refresh()
+    }
+
+    fun reloadLocalPreferences() {
+        stationPreferences = preferencesStore.load()
+        favoriteStationIds = favoriteStationsStore.load()
+        _uiState.value = _uiState.value.copy(
+            radiusEnabled = stationPreferences.radiusEnabled,
+            radiusKm = stationPreferences.radiusKm,
+            radiusInput = stationPreferences.radiusKm.toString(),
+            radiusInputError = null,
+            sortMode = stationPreferences.sortMode,
+            scope = stationPreferences.scope,
+            favoriteStationIds = favoriteStationIds,
+        )
+        recomputeDisplayedStations()
     }
 
     fun refresh() {
