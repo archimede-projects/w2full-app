@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archimede.w2full.W2FullApplication
 import com.archimede.w2full.data.repository.PriceHistoryPoint
+import com.archimede.w2full.data.repository.PriceHistoryStation
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -37,7 +38,10 @@ private val HistoryDateFormatter: DateTimeFormatter =
 fun PriceHistoryRoute() {
     val application = LocalContext.current.applicationContext as W2FullApplication
     val factory = remember(application) {
-        PriceHistoryViewModel.Factory(application.priceHistoryRepository)
+        PriceHistoryViewModel.Factory(
+            repository = application.priceHistoryRepository,
+            favoriteStationsStore = application.historyFavoriteStationsStore,
+        )
     }
     val viewModel: PriceHistoryViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -45,6 +49,7 @@ fun PriceHistoryRoute() {
     PriceHistoryScreen(
         state = state,
         onStationSelected = viewModel::selectStation,
+        onFavoriteToggle = viewModel::toggleFavorite,
         onFuelSelected = viewModel::selectFuelType,
         onServiceSelected = viewModel::selectServiceMode,
     )
@@ -54,10 +59,14 @@ fun PriceHistoryRoute() {
 private fun PriceHistoryScreen(
     state: PriceHistoryUiState,
     onStationSelected: (Long) -> Unit,
+    onFavoriteToggle: (Long) -> Unit,
     onFuelSelected: (String) -> Unit,
     onServiceSelected: (Boolean) -> Unit,
 ) {
     val selectedStation = state.stations.firstOrNull { it.stationId == state.selectedStationId }
+    val stationGroups = remember(state.stations, state.favoriteStationIds) {
+        groupHistoryStations(state.stations, state.favoriteStationIds)
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -97,17 +106,12 @@ private fun PriceHistoryScreen(
 
         item {
             HistoryFilterSection(title = "Stazione") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(state.stations, key = { it.stationId }) { station ->
-                        FilterChip(
-                            selected = station.stationId == state.selectedStationId,
-                            onClick = { onStationSelected(station.stationId) },
-                            label = {
-                                Text(station.name.ifBlank { "Eni #${station.stationId}" })
-                            },
-                        )
-                    }
-                }
+                HistoryStationSelector(
+                    groups = stationGroups,
+                    favoriteStationIds = state.favoriteStationIds,
+                    selectedStationId = state.selectedStationId,
+                    onStationSelected = onStationSelected,
+                )
             }
         }
 
@@ -119,6 +123,16 @@ private fun PriceHistoryScreen(
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item {
+                val isFavorite = station.stationId in state.favoriteStationIds
+                FilterChip(
+                    selected = isFavorite,
+                    onClick = { onFavoriteToggle(station.stationId) },
+                    label = {
+                        Text(if (isFavorite) "★ Preferita" else "☆ Aggiungi ai preferiti")
+                    },
                 )
             }
         }
@@ -177,6 +191,77 @@ private fun PriceHistoryScreen(
         }
 
         item { Column(modifier = Modifier.height(4.dp)) {} }
+    }
+}
+
+@Composable
+private fun HistoryStationSelector(
+    groups: HistoryStationGroups,
+    favoriteStationIds: Set<Long>,
+    selectedStationId: Long?,
+    onStationSelected: (Long) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (groups.favorites.isNotEmpty()) {
+            Text(
+                text = "Preferite",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HistoryStationChipRow(
+                stations = groups.favorites,
+                favoriteStationIds = favoriteStationIds,
+                selectedStationId = selectedStationId,
+                onStationSelected = onStationSelected,
+            )
+            if (groups.others.isNotEmpty()) {
+                Text(
+                    text = "Altre stazioni",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HistoryStationChipRow(
+                    stations = groups.others,
+                    favoriteStationIds = favoriteStationIds,
+                    selectedStationId = selectedStationId,
+                    onStationSelected = onStationSelected,
+                )
+            }
+        } else {
+            HistoryStationChipRow(
+                stations = groups.others,
+                favoriteStationIds = favoriteStationIds,
+                selectedStationId = selectedStationId,
+                onStationSelected = onStationSelected,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryStationChipRow(
+    stations: List<PriceHistoryStation>,
+    favoriteStationIds: Set<Long>,
+    selectedStationId: Long?,
+    onStationSelected: (Long) -> Unit,
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(stations, key = { it.stationId }) { station ->
+            val stationLabel = station.name.ifBlank { "Eni #${station.stationId}" }
+            FilterChip(
+                selected = station.stationId == selectedStationId,
+                onClick = { onStationSelected(station.stationId) },
+                label = {
+                    Text(
+                        if (station.stationId in favoriteStationIds) {
+                            "★ $stationLabel"
+                        } else {
+                            stationLabel
+                        },
+                    )
+                },
+            )
+        }
     }
 }
 
