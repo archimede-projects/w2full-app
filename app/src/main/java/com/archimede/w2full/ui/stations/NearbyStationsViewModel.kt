@@ -32,6 +32,7 @@ enum class NearbyLocationUiStatus {
 data class NearbyStationsUiState(
     val isLoading: Boolean = false,
     val stations: List<MimitStationDistance> = emptyList(),
+    // Kept for compatibility with the RC2 presentation tests. The UI no longer renders a pinned section.
     val favoriteStations: List<MimitStationDistance> = emptyList(),
     val favoriteStationIds: Set<Long> = emptySet(),
     val filteredStationCount: Int = 0,
@@ -47,6 +48,7 @@ data class NearbyStationsUiState(
     val radiusInput: String = StationListPreferences.DEFAULT_RADIUS_KM.toString(),
     val radiusInputError: String? = null,
     val sortMode: StationSortMode = StationSortMode.DISTANCE,
+    val scope: StationListScope = StationListScope.ALL,
     val errorMessage: String? = null,
 )
 
@@ -87,6 +89,7 @@ class NearbyStationsViewModel(
             radiusKm = stationPreferences.radiusKm,
             radiusInput = stationPreferences.radiusKm.toString(),
             sortMode = stationPreferences.sortMode,
+            scope = stationPreferences.scope,
             favoriteStationIds = favoriteStationIds,
         ),
     )
@@ -115,9 +118,7 @@ class NearbyStationsViewModel(
     }
 
     fun loadIfNeeded() {
-        if (!hasLoadedOnce) {
-            refresh()
-        }
+        if (!hasLoadedOnce) refresh()
     }
 
     fun refresh() {
@@ -125,21 +126,13 @@ class NearbyStationsViewModel(
         refreshLocation()
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                errorMessage = null,
-            )
-
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
                 when (repository.refresh()) {
                     is MimitRefreshResult.Success -> {
                         repository.loadCachedSnapshot()?.let(::applySnapshot)
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            errorMessage = null,
-                        )
+                        _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = null)
                     }
-
                     is MimitRefreshResult.Failure -> {
                         repository.loadCachedSnapshot()?.let(::applySnapshot)
                         _uiState.value = _uiState.value.withRefreshFailure()
@@ -171,9 +164,7 @@ class NearbyStationsViewModel(
                 throw cancellation
             } catch (_: Exception) {
                 sourceLocationStatus = NearbyLocationUiStatus.UNAVAILABLE
-                _uiState.value = _uiState.value.copy(
-                    locationStatus = NearbyLocationUiStatus.UNAVAILABLE,
-                )
+                _uiState.value = _uiState.value.copy(locationStatus = NearbyLocationUiStatus.UNAVAILABLE)
                 recomputeDisplayedStations()
             }
         }
@@ -182,31 +173,22 @@ class NearbyStationsViewModel(
     fun setRadiusEnabled(enabled: Boolean) {
         stationPreferences = stationPreferences.copy(radiusEnabled = enabled)
         persistPreferences()
-        _uiState.value = _uiState.value.copy(
-            radiusEnabled = enabled,
-            radiusInputError = null,
-        )
+        _uiState.value = _uiState.value.copy(radiusEnabled = enabled, radiusInputError = null)
         recomputeDisplayedStations()
     }
 
     fun onRadiusInputChanged(input: String) {
         if (input.length <= 3 && input.all(Char::isDigit)) {
-            _uiState.value = _uiState.value.copy(
-                radiusInput = input,
-                radiusInputError = null,
-            )
+            _uiState.value = _uiState.value.copy(radiusInput = input, radiusInputError = null)
         }
     }
 
     fun applyRadiusInput() {
         val input = _uiState.value.radiusInput
         if (!isValidRadiusInput(input)) {
-            _uiState.value = _uiState.value.copy(
-                radiusInputError = "Inserisci un valore da 1 a 200 km",
-            )
+            _uiState.value = _uiState.value.copy(radiusInputError = "Inserisci un valore da 1 a 200 km")
             return
         }
-
         val radiusKm = validatedRadiusOrPrevious(input, stationPreferences.radiusKm)
         stationPreferences = stationPreferences.copy(radiusKm = radiusKm)
         persistPreferences()
@@ -222,6 +204,13 @@ class NearbyStationsViewModel(
         stationPreferences = stationPreferences.copy(sortMode = sortMode)
         persistPreferences()
         _uiState.value = _uiState.value.copy(sortMode = sortMode)
+        recomputeDisplayedStations()
+    }
+
+    fun setScope(scope: StationListScope) {
+        stationPreferences = stationPreferences.copy(scope = scope)
+        persistPreferences()
+        _uiState.value = _uiState.value.copy(scope = scope)
         recomputeDisplayedStations()
     }
 
@@ -254,18 +243,15 @@ class NearbyStationsViewModel(
             pricesByStationId = sourcePricesByStationId,
             locationStatus = sourceLocationStatus,
             preferences = stationPreferences,
-        )
-        val presentation = splitStationsForFavorites(
-            sourceStations = sourceStations,
-            displayedStations = displayedStations,
             favoriteStationIds = favoriteStationIds,
         )
         _uiState.value = _uiState.value.copy(
-            stations = presentation.regular,
-            favoriteStations = presentation.favorites,
+            stations = displayedStations,
+            favoriteStations = displayedStations.filter { it.station.id in favoriteStationIds },
             favoriteStationIds = favoriteStationIds,
             filteredStationCount = displayedStations.size,
             totalStationCount = sourceStations.size,
+            scope = stationPreferences.scope,
         )
     }
 
