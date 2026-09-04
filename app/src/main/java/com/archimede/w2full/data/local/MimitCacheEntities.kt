@@ -51,6 +51,31 @@ data class MimitPriceEntity(
     val communicatedAt: String,
 )
 
+@Entity(
+    tableName = "mimit_price_history",
+    primaryKeys = ["station_id", "fuel_description", "is_self", "communicated_at"],
+    indices = [
+        Index(
+            name = "idx_mimit_price_history_station_fuel_service",
+            value = ["station_id", "fuel_description", "is_self", "communicated_at"],
+        ),
+    ],
+)
+data class MimitPriceHistoryEntity(
+    @ColumnInfo(name = "station_id")
+    val stationId: Long,
+    @ColumnInfo(name = "fuel_description")
+    val fuelDescription: String,
+    @ColumnInfo(name = "price_milli_euro_per_unit")
+    val priceMilliEuroPerUnit: Long,
+    @ColumnInfo(name = "is_self")
+    val isSelf: Boolean,
+    @ColumnInfo(name = "communicated_at")
+    val communicatedAt: String,
+    @ColumnInfo(name = "imported_at_epoch_millis")
+    val importedAtEpochMillis: Long,
+)
+
 @Entity(tableName = "mimit_sync_state")
 data class MimitSyncStateEntity(
     @PrimaryKey
