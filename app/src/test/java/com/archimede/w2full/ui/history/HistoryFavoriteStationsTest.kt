@@ -3,6 +3,7 @@ package com.archimede.w2full.ui.history
 import com.archimede.w2full.data.repository.PriceHistoryStation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,6 +27,19 @@ class HistoryFavoriteStationsTest {
     }
 
     @Test
+    fun historyListContainsOnlyFavoriteStationsWithHistory() {
+        assertEquals(
+            listOf(1L, 3L),
+            historyStationsForFavorites(stations, setOf(1, 3, 999)).map { it.stationId },
+        )
+    }
+
+    @Test
+    fun historyListIsEmptyWhenNoFavoriteHasHistory() {
+        assertTrue(historyStationsForFavorites(stations, setOf(999)).isEmpty())
+    }
+
+    @Test
     fun selectionPrefersFavoriteWhenCurrentSelectionIsInvalid() {
         assertEquals(
             3L,
@@ -45,6 +59,28 @@ class HistoryFavoriteStationsTest {
                 currentStationId = 2,
                 stations = stations,
                 favoriteStationIds = setOf(3),
+            ),
+        )
+    }
+
+    @Test
+    fun filteredHistorySelectionDropsRemovedFavoriteAndFallsBack() {
+        val favoriteStations = historyStationsForFavorites(stations, setOf(1, 3))
+        assertEquals(
+            1L,
+            resolveHistoryStationSelection(
+                currentStationId = 2,
+                stations = favoriteStations,
+                favoriteStationIds = setOf(1, 3),
+            ),
+        )
+
+        val noFavorites = historyStationsForFavorites(stations, emptySet())
+        assertNull(
+            resolveHistoryStationSelection(
+                currentStationId = 1,
+                stations = noFavorites,
+                favoriteStationIds = emptySet(),
             ),
         )
     }
