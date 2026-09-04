@@ -10,6 +10,8 @@ import com.archimede.w2full.data.mimit.MimitStationPriceSelector
 import com.archimede.w2full.data.mimit.NearbyStationsRepository
 import com.archimede.w2full.data.mimit.NearbyStationsSnapshot
 import com.archimede.w2full.location.UserLocationResult
+import com.archimede.w2full.ui.history.HistoryFavoriteStationsStore
+import com.archimede.w2full.ui.history.InMemoryHistoryFavoriteStationsStore
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -30,6 +32,8 @@ enum class NearbyLocationUiStatus {
 data class NearbyStationsUiState(
     val isLoading: Boolean = false,
     val stations: List<MimitStationDistance> = emptyList(),
+    val favoriteStations: List<MimitStationDistance> = emptyList(),
+    val favoriteStationIds: Set<Long> = emptySet(),
     val totalStationCount: Int = 0,
     val locationStatus: NearbyLocationUiStatus? = null,
     val extractionDate: LocalDate? = null,
@@ -45,6 +49,25 @@ data class NearbyStationsUiState(
     val errorMessage: String? = null,
 )
 
+internal data class FavoriteStationPresentation(
+    val favorites: List<MimitStationDistance>,
+    val regular: List<MimitStationDistance>,
+)
+
+internal fun splitStationsForFavorites(
+    sourceStations: List<MimitStationDistance>,
+    displayedStations: List<MimitStationDistance>,
+    favoriteStationIds: Set<Long>,
+): FavoriteStationPresentation = FavoriteStationPresentation(
+    favorites = sourceStations.filter { it.station.id in favoriteStationIds },
+    regular = displayedStations.filterNot { it.station.id in favoriteStationIds },
+)
+
+internal fun toggledFavoriteStationIds(
+    current: Set<Long>,
+    stationId: Long,
+): Set<Long> = if (stationId in current) current - stationId else current + stationId
+
 internal fun NearbyStationsUiState.withRefreshFailure(): NearbyStationsUiState = copy(
     isLoading = false,
     errorMessage = MIMIT_REFRESH_ERROR_MESSAGE,
@@ -53,14 +76,17 @@ internal fun NearbyStationsUiState.withRefreshFailure(): NearbyStationsUiState =
 class NearbyStationsViewModel(
     private val repository: NearbyStationsRepository,
     private val preferencesStore: StationListPreferencesStore = InMemoryStationListPreferencesStore(),
+    private val favoriteStationsStore: HistoryFavoriteStationsStore = InMemoryHistoryFavoriteStationsStore(),
 ) : ViewModel() {
     private var stationPreferences = preferencesStore.load()
+    private var favoriteStationIds = favoriteStationsStore.load()
     private val _uiState = MutableStateFlow(
         NearbyStationsUiState(
             radiusEnabled = stationPreferences.radiusEnabled,
             radiusKm = stationPreferences.radiusKm,
             radiusInput = stationPreferences.radiusKm.toString(),
             sortMode = stationPreferences.sortMode,
+            favoriteStationIds = favoriteStationIds,
         ),
     )
     val uiState: StateFlow<NearbyStationsUiState> = _uiState.asStateFlow()
@@ -198,6 +224,13 @@ class NearbyStationsViewModel(
         recomputeDisplayedStations()
     }
 
+    fun toggleFavorite(stationId: Long) {
+        if (sourceStations.none { it.station.id == stationId }) return
+        favoriteStationIds = toggledFavoriteStationIds(favoriteStationIds, stationId)
+        favoriteStationsStore.save(favoriteStationIds)
+        recomputeDisplayedStations()
+    }
+
     private fun applySnapshot(snapshot: NearbyStationsSnapshot) {
         sourceStations = snapshot.rankedStations.stations
         sourcePricesByStationId = snapshot.pricesByStationId
@@ -215,13 +248,21 @@ class NearbyStationsViewModel(
     }
 
     private fun recomputeDisplayedStations() {
+        val displayedStations = filterAndSortStations(
+            stations = sourceStations,
+            pricesByStationId = sourcePricesByStationId,
+            locationStatus = sourceLocationStatus,
+            preferences = stationPreferences,
+        )
+        val presentation = splitStationsForFavorites(
+            sourceStations = sourceStations,
+            displayedStations = displayedStations,
+            favoriteStationIds = favoriteStationIds,
+        )
         _uiState.value = _uiState.value.copy(
-            stations = filterAndSortStations(
-                stations = sourceStations,
-                pricesByStationId = sourcePricesByStationId,
-                locationStatus = sourceLocationStatus,
-                preferences = stationPreferences,
-            ),
+            stations = presentation.regular,
+            favoriteStations = presentation.favorites,
+            favoriteStationIds = favoriteStationIds,
             totalStationCount = sourceStations.size,
         )
     }
@@ -239,11 +280,12 @@ class NearbyStationsViewModel(
     class Factory(
         private val repository: NearbyStationsRepository,
         private val preferencesStore: StationListPreferencesStore,
+        private val favoriteStationsStore: HistoryFavoriteStationsStore,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(NearbyStationsViewModel::class.java))
-            return NearbyStationsViewModel(repository, preferencesStore) as T
+            return NearbyStationsViewModel(repository, preferencesStore, favoriteStationsStore) as T
         }
     }
 }
