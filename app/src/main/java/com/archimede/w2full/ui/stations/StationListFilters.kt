@@ -8,11 +8,12 @@ internal fun filterAndSortStations(
     pricesByStationId: Map<Long, MimitStationFuelPrice>,
     locationStatus: NearbyLocationUiStatus?,
     preferences: StationListPreferences,
+    favoriteStationIds: Set<Long> = emptySet(),
 ): List<MimitStationDistance> {
     val radiusFilteringActive =
         preferences.radiusEnabled && locationStatus == NearbyLocationUiStatus.AVAILABLE
 
-    val filtered = if (radiusFilteringActive) {
+    val radiusFiltered = if (radiusFilteringActive) {
         stations.filter { station ->
             station.distanceKm?.let { it <= preferences.radiusKm.toDouble() } == true
         }
@@ -20,12 +21,17 @@ internal fun filterAndSortStations(
         stations
     }
 
+    val scoped = when (preferences.scope) {
+        StationListScope.ALL -> radiusFiltered
+        StationListScope.FAVORITES -> radiusFiltered.filter { it.station.id in favoriteStationIds }
+    }
+
     return when (preferences.sortMode) {
-        StationSortMode.DISTANCE -> filtered
-        StationSortMode.SELF_PRICE -> filtered.sortedWith(
+        StationSortMode.DISTANCE -> scoped
+        StationSortMode.SELF_PRICE -> scoped.sortedWith(
             stationPriceComparator(pricesByStationId, StationSortMode.SELF_PRICE),
         )
-        StationSortMode.SERVED_PRICE -> filtered.sortedWith(
+        StationSortMode.SERVED_PRICE -> scoped.sortedWith(
             stationPriceComparator(pricesByStationId, StationSortMode.SERVED_PRICE),
         )
     }
