@@ -68,13 +68,9 @@ fun NearbyStationsRoute() {
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        viewModel.refresh()
-    }
+    ) { viewModel.refresh() }
 
-    val requestLocationPermission = {
-        permissionLauncher.launch(LocationPermissions)
-    }
+    val requestLocationPermission = { permissionLauncher.launch(LocationPermissions) }
 
     LaunchedEffect(viewModel) {
         if (context.hasAnyLocationPermission()) {
@@ -95,6 +91,7 @@ fun NearbyStationsRoute() {
         onRadiusInputChanged = viewModel::onRadiusInputChanged,
         onApplyRadius = viewModel::applyRadiusInput,
         onSortModeChanged = viewModel::setSortMode,
+        onScopeChanged = viewModel::setScope,
         onFavoriteToggle = viewModel::toggleFavorite,
     )
 }
@@ -109,6 +106,7 @@ private fun NearbyStationsScreen(
     onRadiusInputChanged: (String) -> Unit,
     onApplyRadius: () -> Unit,
     onSortModeChanged: (StationSortMode) -> Unit,
+    onScopeChanged: (StationListScope) -> Unit,
     onFavoriteToggle: (Long) -> Unit,
 ) {
     LazyColumn(
@@ -125,20 +123,11 @@ private fun NearbyStationsScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Text(
-                    text = "Stazioni Eni vicine",
-                    style = MaterialTheme.typography.titleLarge,
-                )
+                Text(text = "Stazioni Eni vicine", style = MaterialTheme.typography.titleLarge)
             }
         }
 
-        item {
-            UpdateStatusCard(
-                state = state,
-                onRefresh = onRefresh,
-            )
-        }
-
+        item { UpdateStatusCard(state = state, onRefresh = onRefresh) }
         item {
             LocationStatusCard(
                 status = state.locationStatus,
@@ -146,7 +135,6 @@ private fun NearbyStationsScreen(
                 onRetryLocation = onRetryLocation,
             )
         }
-
         item {
             StationFiltersCard(
                 state = state,
@@ -154,15 +142,13 @@ private fun NearbyStationsScreen(
                 onRadiusInputChanged = onRadiusInputChanged,
                 onApplyRadius = onApplyRadius,
                 onSortModeChanged = onSortModeChanged,
+                onScopeChanged = onScopeChanged,
             )
         }
 
         if (state.isLoading) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     CircularProgressIndicator()
                 }
             }
@@ -176,40 +162,9 @@ private fun NearbyStationsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(message)
-                        TextButton(onClick = onRefresh) {
-                            Text("Riprova aggiornamento")
-                        }
+                        TextButton(onClick = onRefresh) { Text("Riprova aggiornamento") }
                     }
                 }
-            }
-        }
-
-        if (state.favoriteStations.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Preferite",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            items(
-                items = state.favoriteStations,
-                key = { "favorite-${it.station.id}" },
-            ) { item ->
-                StationCard(
-                    item = item,
-                    selectedFuelType = state.selectedFuelType,
-                    price = state.pricesByStationId[item.station.id],
-                    isFavorite = true,
-                    onFavoriteToggle = onFavoriteToggle,
-                )
-            }
-            item {
-                Text(
-                    text = "Altre stazioni",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
             }
         }
 
@@ -218,27 +173,23 @@ private fun NearbyStationsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = when {
-                            state.favoriteStations.isNotEmpty() ->
-                                "Nessun'altra stazione Eni nel filtro corrente."
+                            state.scope == StationListScope.FAVORITES ->
+                                "Nessuna stazione preferita nel filtro corrente."
                             state.totalStationCount > 0 && state.radiusEnabled ->
                                 "Nessuna stazione Eni entro il raggio impostato."
-                            else ->
-                                "Nessuna stazione Eni disponibile."
+                            else -> "Nessuna stazione Eni disponibile."
                         },
                         modifier = Modifier.padding(14.dp),
                     )
                 }
             }
         } else {
-            items(
-                items = state.stations,
-                key = { it.station.id },
-            ) { item ->
+            items(items = state.stations, key = { it.station.id }) { item ->
                 StationCard(
                     item = item,
                     selectedFuelType = state.selectedFuelType,
                     price = state.pricesByStationId[item.station.id],
-                    isFavorite = false,
+                    isFavorite = item.station.id in state.favoriteStationIds,
                     onFavoriteToggle = onFavoriteToggle,
                 )
             }
@@ -247,37 +198,28 @@ private fun NearbyStationsScreen(
 }
 
 @Composable
-private fun UpdateStatusCard(
-    state: NearbyStationsUiState,
-    onRefresh: () -> Unit,
-) {
+private fun UpdateStatusCard(state: NearbyStationsUiState, onRefresh: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = lastUpdateLabel(state.lastSuccessfulUpdateEpochMillis),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            state.extractionDate?.let { extractionDate ->
+            Text(text = lastUpdateLabel(state.lastSuccessfulUpdateEpochMillis), style = MaterialTheme.typography.labelLarge)
+            state.extractionDate?.let {
                 Text(
-                    text = "Estrazione anagrafica: $extractionDate",
+                    text = "Estrazione anagrafica: $it",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            state.pricesExtractionDate?.let { extractionDate ->
+            state.pricesExtractionDate?.let {
                 Text(
-                    text = "Estrazione prezzi: $extractionDate",
+                    text = "Estrazione prezzi: $it",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Button(
-                onClick = onRefresh,
-                enabled = !state.isLoading,
-            ) {
+            Button(onClick = onRefresh, enabled = !state.isLoading) {
                 Text(if (state.isLoading) "Aggiornamento…" else "Aggiorna")
             }
         }
@@ -292,39 +234,25 @@ private fun LocationStatusCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = locationStatusTitle(status),
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                Text(text = locationStatusTitle(status), style = MaterialTheme.typography.labelLarge)
                 Text(
                     text = locationStatusSubtitle(status),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
             when (status) {
-                NearbyLocationUiStatus.PERMISSION_DENIED -> {
-                    Button(onClick = onRequestLocationPermission) {
-                        Text("Consenti posizione")
-                    }
+                NearbyLocationUiStatus.PERMISSION_DENIED -> Button(onClick = onRequestLocationPermission) {
+                    Text("Consenti posizione")
                 }
-
-                NearbyLocationUiStatus.UNAVAILABLE -> {
-                    TextButton(onClick = onRetryLocation) {
-                        Text("Riprova posizione")
-                    }
+                NearbyLocationUiStatus.UNAVAILABLE -> TextButton(onClick = onRetryLocation) {
+                    Text("Riprova posizione")
                 }
-
-                NearbyLocationUiStatus.AVAILABLE,
-                null,
-                -> Unit
+                NearbyLocationUiStatus.AVAILABLE, null -> Unit
             }
         }
     }
@@ -337,43 +265,43 @@ private fun StationFiltersCard(
     onRadiusInputChanged: (String) -> Unit,
     onApplyRadius: () -> Unit,
     onSortModeChanged: (StationSortMode) -> Unit,
+    onScopeChanged: (StationListScope) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = "Filtri",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Text(text = "Filtri", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+            Text("Mostra", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = state.scope == StationListScope.ALL,
+                    onClick = { onScopeChanged(StationListScope.ALL) },
+                    label = { Text("Tutte") },
+                )
+                FilterChip(
+                    selected = state.scope == StationListScope.FAVORITES,
+                    onClick = { onScopeChanged(StationListScope.FAVORITES) },
+                    label = { Text("★ Preferite") },
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Limita distanza", style = MaterialTheme.typography.labelLarge)
                     Text(
-                        text = if (state.radiusEnabled) {
-                            "Raggio massimo: ${state.radiusKm} km"
-                        } else {
-                            "Nessun limite"
-                        },
+                        text = if (state.radiusEnabled) "Raggio massimo: ${state.radiusKm} km" else "Nessun limite",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(
-                    checked = state.radiusEnabled,
-                    onCheckedChange = onRadiusEnabledChanged,
-                )
+                Switch(checked = state.radiusEnabled, onCheckedChange = onRadiusEnabledChanged)
             }
 
             if (state.radiusEnabled) {
@@ -384,19 +312,11 @@ private fun StationFiltersCard(
                     label = { Text("Raggio massimo (km)") },
                     singleLine = true,
                     isError = state.radiusInputError != null,
-                    supportingText = state.radiusInputError?.let { message ->
-                        { Text(message) }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done,
-                    ),
+                    supportingText = state.radiusInputError?.let { message -> { Text(message) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { onApplyRadius() }),
                 )
-                Button(onClick = onApplyRadius) {
-                    Text("Applica raggio")
-                }
-
+                Button(onClick = onApplyRadius) { Text("Applica raggio") }
                 if (state.locationStatus != NearbyLocationUiStatus.AVAILABLE) {
                     Text(
                         text = "Il raggio verrà applicato quando la posizione sarà disponibile.",
@@ -408,33 +328,16 @@ private fun StationFiltersCard(
 
             Text("Ordina per", style = MaterialTheme.typography.labelLarge)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SortChip(
-                    label = "Distanza",
-                    mode = StationSortMode.DISTANCE,
-                    selectedMode = state.sortMode,
-                    onSortModeChanged = onSortModeChanged,
-                )
-                SortChip(
-                    label = "Prezzo Self",
-                    mode = StationSortMode.SELF_PRICE,
-                    selectedMode = state.sortMode,
-                    onSortModeChanged = onSortModeChanged,
-                )
-                SortChip(
-                    label = "Prezzo Servito",
-                    mode = StationSortMode.SERVED_PRICE,
-                    selectedMode = state.sortMode,
-                    onSortModeChanged = onSortModeChanged,
-                )
+                SortChip("Distanza", StationSortMode.DISTANCE, state.sortMode, onSortModeChanged)
+                SortChip("Prezzo Self", StationSortMode.SELF_PRICE, state.sortMode, onSortModeChanged)
+                SortChip("Prezzo Servito", StationSortMode.SERVED_PRICE, state.sortMode, onSortModeChanged)
             }
 
             Text(
-                text = "Nel filtro ${state.filteredStationCount} di ${state.totalStationCount} stazioni · ${state.favoriteStations.size} preferite · ${state.selectedFuelType}",
+                text = "${state.filteredStationCount} di ${state.totalStationCount} stazioni · ${state.favoriteStationIds.size} preferite · ${state.selectedFuelType}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -466,11 +369,8 @@ private fun StationCard(
 ) {
     val station = item.station
     val title = station.name.ifBlank { "Stazione Eni #${station.id}" }
-    val address = listOf(
-        station.address,
-        station.municipality,
-        station.province,
-    ).filter { it.isNotBlank() }
+    val address = listOf(station.address, station.municipality, station.province)
+        .filter { it.isNotBlank() }
         .joinToString(" · ")
         .ifBlank { "Indirizzo non disponibile" }
 
@@ -479,28 +379,23 @@ private fun StationCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            TextButton(onClick = { onFavoriteToggle(station.id) }) {
-                Text(if (isFavorite) "★ Preferita" else "☆ Aggiungi ai preferiti")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = { onFavoriteToggle(station.id) }) {
+                    Text(if (isFavorite) "★" else "☆", style = MaterialTheme.typography.titleLarge)
+                }
             }
-            Text(
-                text = selectedFuelType,
-                style = MaterialTheme.typography.labelLarge,
-            )
+            Text(text = selectedFuelType, style = MaterialTheme.typography.labelLarge)
             Text(
                 text = formatStationFuelPrice(price),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Text(
-                text = address,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(text = address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 text = item.distanceKm?.let(::formatDistanceKm) ?: "Distanza non disponibile",
                 style = MaterialTheme.typography.labelLarge,
@@ -529,26 +424,15 @@ internal fun lastUpdateLabel(
     nowEpochMillis: Long = System.currentTimeMillis(),
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): String {
-    if (epochMillis == null) {
-        return "Ultimo aggiornamento: non ancora disponibile"
-    }
-
+    if (epochMillis == null) return "Ultimo aggiornamento: non ancora disponibile"
     val elapsedMillis = (nowEpochMillis - epochMillis).coerceAtLeast(0L)
     val elapsedHours = elapsedMillis / 3_600_000L
     val relative = when {
         elapsedMillis < 3_600_000L -> "Aggiornato pochi minuti fa"
-        elapsedHours < 24L -> if (elapsedHours == 1L) {
-            "Aggiornato 1 ora fa"
-        } else {
-            "Aggiornato $elapsedHours ore fa"
-        }
+        elapsedHours < 24L -> if (elapsedHours == 1L) "Aggiornato 1 ora fa" else "Aggiornato $elapsedHours ore fa"
         else -> {
             val elapsedDays = elapsedMillis / 86_400_000L
-            if (elapsedDays == 1L) {
-                "Aggiornato 1 giorno fa"
-            } else {
-                "Aggiornato $elapsedDays giorni fa"
-            }
+            if (elapsedDays == 1L) "Aggiornato 1 giorno fa" else "Aggiornato $elapsedDays giorni fa"
         }
     }
     val absolute = Instant.ofEpochMilli(epochMillis)
@@ -560,12 +444,8 @@ internal fun lastUpdateLabel(
 internal fun formatStationFuelPrice(price: MimitStationFuelPrice?): String {
     if (price == null) return "Prezzo non disponibile"
     val values = buildList {
-        price.self?.let {
-            add("Self ${formatPriceMilliEuro(it.priceMilliEuroPerUnit)} ${price.unit.label}")
-        }
-        price.served?.let {
-            add("Servito ${formatPriceMilliEuro(it.priceMilliEuroPerUnit)} ${price.unit.label}")
-        }
+        price.self?.let { add("Self ${formatPriceMilliEuro(it.priceMilliEuroPerUnit)} ${price.unit.label}") }
+        price.served?.let { add("Servito ${formatPriceMilliEuro(it.priceMilliEuroPerUnit)} ${price.unit.label}") }
     }
     return values.joinToString(" · ").ifBlank { "Prezzo non disponibile" }
 }
@@ -576,8 +456,7 @@ internal fun formatPriceMilliEuro(priceMilliEuroPerUnit: Long): String {
     return String.format(Locale.ITALY, "%d,%03d", whole, fraction)
 }
 
-private fun formatDistanceKm(distanceKm: Double): String =
-    String.format(Locale.ITALY, "%.1f km", distanceKm)
+private fun formatDistanceKm(distanceKm: Double): String = String.format(Locale.ITALY, "%.1f km", distanceKm)
 
 private fun Context.hasAnyLocationPermission(): Boolean =
     checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
