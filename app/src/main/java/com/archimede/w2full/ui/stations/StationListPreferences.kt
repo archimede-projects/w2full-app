@@ -8,10 +8,16 @@ enum class StationSortMode {
     SERVED_PRICE,
 }
 
+enum class StationListScope {
+    ALL,
+    FAVORITES,
+}
+
 data class StationListPreferences(
     val radiusEnabled: Boolean = false,
     val radiusKm: Int = DEFAULT_RADIUS_KM,
     val sortMode: StationSortMode = StationSortMode.DISTANCE,
+    val scope: StationListScope = StationListScope.ALL,
 ) {
     companion object {
         const val MIN_RADIUS_KM = 1
@@ -40,10 +46,14 @@ class SharedPreferencesStationListPreferencesStore(
         val sortMode = preferences.getString(KEY_SORT_MODE, null)
             ?.let { raw -> runCatching { StationSortMode.valueOf(raw) }.getOrNull() }
             ?: StationSortMode.DISTANCE
+        val scope = preferences.getString(KEY_SCOPE, null)
+            ?.let { raw -> runCatching { StationListScope.valueOf(raw) }.getOrNull() }
+            ?: StationListScope.ALL
         return StationListPreferences(
             radiusEnabled = preferences.getBoolean(KEY_RADIUS_ENABLED, false),
             radiusKm = radiusKm,
             sortMode = sortMode,
+            scope = scope,
         )
     }
 
@@ -58,6 +68,7 @@ class SharedPreferencesStationListPreferencesStore(
                 ),
             )
             .putString(KEY_SORT_MODE, preferences.sortMode.name)
+            .putString(KEY_SCOPE, preferences.scope.name)
             .apply()
     }
 
@@ -66,6 +77,7 @@ class SharedPreferencesStationListPreferencesStore(
         const val KEY_RADIUS_ENABLED = "radius_enabled"
         const val KEY_RADIUS_KM = "radius_km"
         const val KEY_SORT_MODE = "sort_mode"
+        const val KEY_SCOPE = "scope"
     }
 }
 

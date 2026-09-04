@@ -3,6 +3,9 @@ package com.archimede.w2full.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -15,14 +18,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.archimede.w2full.ui.history.PriceHistoryRoute
 import com.archimede.w2full.ui.refueling.RefuelingRoute
+import com.archimede.w2full.ui.settings.SettingsRoute
 import com.archimede.w2full.ui.stations.NearbyStationsRoute
-import com.archimede.w2full.ui.vehicle.VehicleSettingsRoute
 
 private enum class RootDestination {
     REFUELING,
     STATIONS,
     HISTORY,
-    VEHICLE,
+    SETTINGS,
 }
 
 @Composable
@@ -51,10 +54,15 @@ fun W2FullRoot() {
                     label = { Text("Storico") },
                 )
                 NavigationBarItem(
-                    selected = destination == RootDestination.VEHICLE,
-                    onClick = { destination = RootDestination.VEHICLE },
-                    icon = { Text("V") },
-                    label = { Text("Veicolo") },
+                    selected = destination == RootDestination.SETTINGS,
+                    onClick = { destination = RootDestination.SETTINGS },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Impostazioni",
+                        )
+                    },
+                    label = { Text("Impostazioni") },
                 )
             }
         },
@@ -68,7 +76,7 @@ fun W2FullRoot() {
                 RootDestination.REFUELING -> RefuelingRoute()
                 RootDestination.STATIONS -> NearbyStationsRoute()
                 RootDestination.HISTORY -> PriceHistoryRoute()
-                RootDestination.VEHICLE -> VehicleSettingsRoute()
+                RootDestination.SETTINGS -> SettingsRoute()
             }
         }
     }

@@ -15,6 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -30,7 +31,7 @@ import com.archimede.w2full.W2FullApplication
 import com.archimede.w2full.data.repository.VehicleFuelOptions
 
 @Composable
-fun VehicleSettingsRoute() {
+fun VehicleSettingsRoute(onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val application = context.applicationContext as W2FullApplication
     val factory = remember(application) {
@@ -42,6 +43,7 @@ fun VehicleSettingsRoute() {
     VehicleSettingsScreen(
         state = state,
         onSelectFuel = viewModel::selectFuel,
+        onBack = onBack,
     )
 }
 
@@ -49,6 +51,7 @@ fun VehicleSettingsRoute() {
 private fun VehicleSettingsScreen(
     state: VehicleSettingsUiState,
     onSelectFuel: (String) -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -57,6 +60,10 @@ private fun VehicleSettingsScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (onBack != null) {
+            TextButton(onClick = onBack) { Text("← Impostazioni") }
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = "W2Full",
@@ -64,10 +71,7 @@ private fun VehicleSettingsScreen(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Text(
-                text = "Veicolo",
-                style = MaterialTheme.typography.titleLarge,
-            )
+            Text(text = "Veicolo", style = MaterialTheme.typography.titleLarge)
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -109,10 +113,7 @@ private fun VehicleSettingsScreen(
                         .padding(vertical = 4.dp),
                 ) {
                     state.fuelOptions.forEach { fuelType ->
-                        val selected = VehicleFuelOptions.same(
-                            fuelType,
-                            state.selectedFuelType,
-                        )
+                        val selected = VehicleFuelOptions.same(fuelType, state.selectedFuelType)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -131,10 +132,7 @@ private fun VehicleSettingsScreen(
                                 onClick = null,
                                 enabled = !state.isSaving,
                             )
-                            Text(
-                                text = fuelType,
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                            Text(text = fuelType, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
