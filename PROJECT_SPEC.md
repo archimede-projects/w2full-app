@@ -1,12 +1,11 @@
 # W2Full — Project Specification
 
-> **Fonte di verità del progetto.** Questa versione chiude M4 e il checkpoint infrastrutturale di distribuzione GitHub Releases e apre M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
+> **Fonte di verità del progetto.** Questa versione chiude M0–M5 e il checkpoint infrastrutturale di distribuzione GitHub Releases. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
 
 ## Stato
 
-- M0–M4: **chiuse**.
+- M0–M5: **chiuse**.
 - Distribuzione GitHub Releases: **chiusa**.
-- M5 — storico prezzi + grafico: **in corso; candidato branch verificato, integrazione su `main` pendente**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **non iniziata**.
 
@@ -54,11 +53,11 @@ Questo intervento è stato esclusivamente infrastrutturale. Non ha introdotto fu
 ### Workflow permanente
 
 Il tree finale di `main` contiene:
-- `.github/workflows/android-ci.yml` invariato rispetto al checkpoint precedente;
+- `.github/workflows/android-ci.yml`;
 - `.github/workflows/android-release.yml` come unico workflow di distribuzione.
 
 Contratto permanente verificato:
-- trigger esclusivamente su `push` di tag `v*`;
+- trigger Release esclusivamente su `push` di tag `v*`;
 - nessun `workflow_call`;
 - nessun `workflow_dispatch` per pubblicare APK;
 - nessun `.github/workflows/bootstrap-preview-release.yml` o altro bootstrap Release;
@@ -73,80 +72,73 @@ Contratto permanente verificato:
 
 ### Validazione Release reale
 
-Validazione eseguita prima dell'integrazione:
 - commit di validazione `c3567b4b7afb7f37651784842460a41a94bc8efc` — `chore(release): validate distribution workflow`;
 - run `33884215157`, job `101059934737`: **SUCCESS**;
-- test JVM: **SUCCESS**;
-- `assembleDebug`: **SUCCESS**;
 - certificato SHA-256 verificato: `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
 - public key SHA-256 verificata: `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
 - Release reale `v0.4.0-rc1-distcheck1`, prerelease, target commit `c3567b4b7afb7f37651784842460a41a94bc8efc`;
 - asset `w2full-v0.4.0-rc1-distcheck1-debug.apk`;
-- APK SHA-256 `616ea026b3d3e80ab7e7e865df624a7df088479f9ecc4838015d2b14f8d846ef`;
-- cleanup del trigger/logica temporanea eseguito nel branch prima dell'integrazione.
+- APK SHA-256 `616ea026b3d3e80ab7e7e865df624a7df088479f9ecc4838015d2b14f8d846ef`.
 
 ### Integrazione finale
 
-- PR `#5` — `ci: finalize GitHub Releases distribution`;
-- merge eseguito con **squash**, così la storia temporanea di validazione non entra nella storia lineare di `main`;
-- commit integrato su `main`: `99803fd1ac1af01622d39ab406833a81bebc3a1b` — `ci: finalize GitHub Releases distribution`;
-- parent diretto: `3abd465cd9f049bc45b552a68d174f3d83b75191`;
-- CI reale di integrazione su `main`: run `33884796836`, job `101061834450`: **SUCCESS**;
-- nella CI di integrazione: test JVM, build APK, verifica firma persistente e upload artifact tutti **SUCCESS**;
-- log CI integrazione: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- commit documentale finale `200b32d708cc1850564e5d08496a3234e1c9ea79`, con CI run `33885088932`, job `101062798425`: **SUCCESS**;
-- `release-distribution` e `release-distribution-clean` riallineati a `200b32d708cc1850564e5d08496a3234e1c9ea79`.
+- PR `#5` — `ci: finalize GitHub Releases distribution`, merge squash;
+- commit integrato su `main`: `99803fd1ac1af01622d39ab406833a81bebc3a1b`;
+- CI di integrazione run `33884796836`, job `101061834450`: **SUCCESS**;
+- commit documentale finale precedente a M5: `200b32d708cc1850564e5d08496a3234e1c9ea79`, CI run `33885088932`, job `101062798425`: **SUCCESS**;
+- `release-distribution` e `release-distribution-clean` riallineati a `200b32d708cc1850564e5d08496a3234e1c9ea79` prima dell'avvio M5.
 
-## M5 — storico prezzi + grafico
+## M5 — storico prezzi + grafico — chiusa
 
-Stato: **[~] candidato branch verificato; integrazione pendente**.
+Stato: **[x] chiusa**.
 
-### Obiettivo
+### Contratto implementato
 
-Conservare localmente, tra refresh MIMIT successivi, le osservazioni di prezzo delle stazioni Eni e permettere di consultare l'andamento cronologico di una stazione/carburante/modalità di servizio. M5 non introduce notifiche, soglie o nuovi download esterni rispetto al flusso MIMIT già esistente.
-
-### Decisioni tecniche fissate prima del codice
-
-- branch di lavoro: `m5-price-history`, derivato dall'HEAD `main` `200b32d708cc1850564e5d08496a3234e1c9ea79`;
-- Room passa da schema `2` a `3` con migrazione esplicita `2→3` e senza migrazione distruttiva;
-- la tabella `mimit_prices` resta la cache corrente usata da M4: continua a essere sostituita atomicamente a ogni refresh;
-- nuova tabella append-only `mimit_price_history`, indipendente dalla cancellazione della cache corrente;
-- chiave logica/primaria dello storico: `station_id`, `fuel_description`, `is_self`, `communicated_at`; il medesimo record MIMIT importato più volte non crea duplicati;
-- lo storico conserva inoltre `price_milli_euro_per_unit` e `imported_at_epoch_millis`;
-- durante ogni refresh riuscito, le righe prezzo Eni validate vengono inserite nello storico con `INSERT OR IGNORE` nella stessa transazione che aggiorna la cache corrente;
-- nessuna foreign key dallo storico verso `mimit_stations`, così una stazione non presente nella cache corrente non perde la propria serie storica;
-- query storico ordinate cronologicamente per `communicated_at`, con filtro esatto per stazione/carburante/modalità;
-- UI: nuova destinazione bottom-nav `Storico`;
-- selezione iniziale: prima stazione Eni disponibile; carburante iniziale uguale al `defaultFuelType` del veicolo quando presente nello storico, altrimenti primo carburante disponibile; modalità iniziale `Self` quando disponibile, altrimenti `Servito`;
-- grafico lineare realizzato con `androidx.compose.foundation.Canvas`, senza dipendenze chart aggiuntive. Vico è stato rivalutato in M5 ma non introdotto: la linea 3.x corrente usa l'asse Compose Multiplatform/JetBrains, mentre W2Full resta sulla toolchain AndroidX Compose già verificata;
-- il grafico gestisce 0, 1 o più punti: empty state esplicito, punto singolo centrato, più punti collegati in ordine cronologico e serie piatta sulla linea mediana;
-- sotto il grafico viene mostrato l'elenco cronologico inverso con data comunicazione e prezzo €/l;
+- branch di lavoro `m5-price-history`, derivato dall'HEAD `main` `200b32d708cc1850564e5d08496a3234e1c9ea79`;
+- Room schema `3` con migrazione esplicita `2→3`, senza migrazione distruttiva;
+- `mimit_prices` resta la cache corrente M4 e continua a essere sostituita atomicamente a ogni refresh;
+- nuova tabella append-only `mimit_price_history`, senza foreign key verso la cache corrente;
+- chiave primaria/logica storico: `station_id`, `fuel_description`, `is_self`, `communicated_at`;
+- ogni osservazione conserva prezzo in milli-euro/unità e `imported_at_epoch_millis`;
+- refresh riuscito inserisce lo storico con `INSERT OR IGNORE` nella stessa transazione della cache M4: refresh identici non duplicano, una nuova data comunicazione aggiunge un nuovo punto;
+- query per stazione/carburante/modalità ordinate cronologicamente;
+- nuova destinazione bottom-nav `Storico`;
+- selezione stazione, carburante e modalità Self/Servito con fallback al `defaultFuelType` del veicolo e preferenza Self quando disponibile;
+- grafico lineare nativo con `androidx.compose.foundation.Canvas`, senza nuova dipendenza chart;
+- gestione esplicita di serie vuota, punto singolo, serie multipla e serie piatta;
+- elenco rilevazioni sotto il grafico in ordine cronologico inverso con data comunicazione e prezzo €/l;
 - `versionCode = 7`, `versionName = 0.5.0-m5`;
-- M6/M7 restano fuori scope.
+- M6/M7 non incluse.
 
-### Test obbligatori
+### Evidenze branch M5
 
-- migrazione Room `2→3` preserva tabelle/dati M3-M4 e crea lo storico;
-- DAO: inserimento storico deduplicato e query filtrata/ordinata;
-- repository refresh: un refresh aggiunge storico, refresh identico non duplica, refresh successivo con nuova comunicazione aggiunge un nuovo punto;
-- regression test M3/M4 esistenti tutti verdi;
-- test puri della trasformazione serie grafico/empty-single-multiple;
-- CI branch reale con test JVM, `assembleDebug`, verifica firma persistente e artifact **SUCCESS**;
-- prima di chiudere M5: integrazione su `main`, CI reale su `main` **SUCCESS**, aggiornamento delle evidenze in questa spec e riallineamento branch M5 al commit finale.
+- contratto fissato prima del codice: commit `095c9659d57be37b103ce9d66afa7102f0e6930a`;
+- candidato funzionale verificato `b09cd84bf39b0b40fcd830a50ad45f5d8922a397`;
+- prima CI branch run `33886894102`, job `101068776817`: **SUCCESS**;
+- artifact `w2full-debug-apk`, ID `9942280190`, digest archivio SHA-256 `e65bc393b76bb7353eaafed2307de13cc878ea713f10f7808ae4d0c625d7304d`;
+- HEAD finale del PR `8c3ecaf70a57bc82fdc5239ea57229bbcaf6bf3e`;
+- CI sul vero HEAD del PR run `33887224084`, job `101069876584`: **SUCCESS**;
+- test JVM, `assembleDebug`, `apksigner` e upload artifact: tutti **SUCCESS**.
 
-### Evidenze candidato branch M5
+Test coperti:
+- migrazione Room `1→3` e `2→3`, con preservazione dati precedenti;
+- deduplica DAO e query filtrate/ordinate;
+- refresh: primo import aggiunge storico, import identico non duplica, nuova comunicazione aggiunge punti;
+- regressioni M3/M4;
+- normalizzazione grafico per empty/single/multiple/flat series.
 
-- contratto M5 fissato prima del codice: commit `095c9659d57be37b103ce9d66afa7102f0e6930a`;
-- candidato verificato: commit `b09cd84bf39b0b40fcd830a50ad45f5d8922a397`;
-- CI branch reale run `33886894102`, job `101068776817`: **SUCCESS**;
-- `testDebugUnitTest`: **SUCCESS**, inclusi migrazione `1→3`/`2→3`, deduplica/query DAO, accumulo storico su refresh e regressioni M3/M4;
-- `assembleDebug`: **SUCCESS**;
-- firma persistente verificata da `apksigner`: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- artifact CI `w2full-debug-apk`, ID `9942280190`, presente e non scaduto al momento della verifica;
-- digest SHA-256 dell'archivio artifact: `e65bc393b76bb7353eaafed2307de13cc878ea713f10f7808ae4d0c625d7304d`;
-- diff contro `main` limitato a implementazione/test/spec M5 più l'aggiunta del solo branch `m5-price-history` ai trigger della CI ordinaria.
+### Integrazione finale M5
 
-M5 resta aperta finché il candidato non è integrato su `main`, la CI reale del commit integrato non è verde e questa spec non registra le evidenze finali.
+- PR `#6` — `feat(m5): add persistent price history and chart`;
+- merge eseguito con **squash**;
+- commit M5 integrato su `main`: `71e89190d653e666f4bc73a56a46c7e1eabc7ec6` — `feat(m5): add persistent price history and chart`;
+- parent diretto: `200b32d708cc1850564e5d08496a3234e1c9ea79`;
+- CI reale su `main` run `33887446442`, job `101070611480`: **SUCCESS**;
+- `testDebugUnitTest`, `assembleDebug`, verifica APK/firma e upload artifact: tutti **SUCCESS**;
+- firma persistente su APK integrato: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact CI main `w2full-debug-apk`, ID `9942483998`, digest archivio SHA-256 `887925f389c310b000514cc8e59d2a4009c5019361a340b38b6e64fa5cb9d27f`.
+
+Il branch `m5-price-history` deve essere riallineato al commit documentale finale di `main` dopo la verifica della relativa CI; non viene dichiarato cancellato.
 
 ## Requisito futuro già approvato
 
