@@ -16,6 +16,7 @@ on:
       - m4-integration-candidate
       - m4-integration-clean
       - m5-price-history
+      - m7-station-filters
   workflow_dispatch:
 
 permissions:

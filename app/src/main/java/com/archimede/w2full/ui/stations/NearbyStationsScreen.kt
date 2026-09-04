@@ -5,27 +5,38 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,7 +58,10 @@ fun NearbyStationsRoute() {
     val context = LocalContext.current
     val application = context.applicationContext as W2FullApplication
     val factory = remember(application) {
-        NearbyStationsViewModel.Factory(application.nearbyStationsRepository)
+        NearbyStationsViewModel.Factory(
+            repository = application.nearbyStationsRepository,
+            preferencesStore = application.stationListPreferencesStore,
+        )
     }
     val viewModel: NearbyStationsViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,6 +91,10 @@ fun NearbyStationsRoute() {
         onRequestLocationPermission = requestLocationPermission,
         onRetryLocation = viewModel::refreshLocation,
         onRefresh = viewModel::refresh,
+        onRadiusEnabledChanged = viewModel::setRadiusEnabled,
+        onRadiusInputChanged = viewModel::onRadiusInputChanged,
+        onApplyRadius = viewModel::applyRadiusInput,
+        onSortModeChanged = viewModel::setSortMode,
     )
 }
 
@@ -86,6 +104,10 @@ private fun NearbyStationsScreen(
     onRequestLocationPermission: () -> Unit,
     onRetryLocation: () -> Unit,
     onRefresh: () -> Unit,
+    onRadiusEnabledChanged: (Boolean) -> Unit,
+    onRadiusInputChanged: (String) -> Unit,
+    onApplyRadius: () -> Unit,
+    onSortModeChanged: (StationSortMode) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -123,6 +145,16 @@ private fun NearbyStationsScreen(
             )
         }
 
+        item {
+            StationFiltersCard(
+                state = state,
+                onRadiusEnabledChanged = onRadiusEnabledChanged,
+                onRadiusInputChanged = onRadiusInputChanged,
+                onApplyRadius = onApplyRadius,
+                onSortModeChanged = onSortModeChanged,
+            )
+        }
+
         if (state.isLoading) {
             item {
                 Row(
@@ -154,7 +186,11 @@ private fun NearbyStationsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "Nessuna stazione Eni disponibile.",
+                        text = if (state.totalStationCount > 0 && state.radiusEnabled) {
+                            "Nessuna stazione Eni entro il raggio impostato."
+                        } else {
+                            "Nessuna stazione Eni disponibile."
+                        },
                         modifier = Modifier.padding(14.dp),
                     )
                 }
@@ -259,6 +295,133 @@ private fun LocationStatusCard(
 }
 
 @Composable
+private fun StationFiltersCard(
+    state: NearbyStationsUiState,
+    onRadiusEnabledChanged: (Boolean) -> Unit,
+    onRadiusInputChanged: (String) -> Unit,
+    onApplyRadius: () -> Unit,
+    onSortModeChanged: (StationSortMode) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Filtri",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text("Limita distanza", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = if (state.radiusEnabled) {
+                            "Raggio massimo: ${state.radiusKm} km"
+                        } else {
+                            "Nessun limite"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.radiusEnabled,
+                    onCheckedChange = onRadiusEnabledChanged,
+                )
+            }
+
+            if (state.radiusEnabled) {
+                OutlinedTextField(
+                    value = state.radiusInput,
+                    onValueChange = onRadiusInputChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Raggio massimo (km)") },
+                    singleLine = true,
+                    isError = state.radiusInputError != null,
+                    supportingText = state.radiusInputError?.let { message ->
+                        { Text(message) }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { onApplyRadius() }),
+                )
+                Button(onClick = onApplyRadius) {
+                    Text("Applica raggio")
+                }
+
+                if (state.locationStatus != NearbyLocationUiStatus.AVAILABLE) {
+                    Text(
+                        text = "Il raggio verrà applicato quando la posizione sarà disponibile.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Text("Ordina per", style = MaterialTheme.typography.labelLarge)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SortChip(
+                    label = "Distanza",
+                    mode = StationSortMode.DISTANCE,
+                    selectedMode = state.sortMode,
+                    onSortModeChanged = onSortModeChanged,
+                )
+                SortChip(
+                    label = "Prezzo Self",
+                    mode = StationSortMode.SELF_PRICE,
+                    selectedMode = state.sortMode,
+                    onSortModeChanged = onSortModeChanged,
+                )
+                SortChip(
+                    label = "Prezzo Servito",
+                    mode = StationSortMode.SERVED_PRICE,
+                    selectedMode = state.sortMode,
+                    onSortModeChanged = onSortModeChanged,
+                )
+            }
+
+            Text(
+                text = "Mostrate ${state.stations.size} di ${state.totalStationCount} stazioni · ${state.selectedFuelType}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SortChip(
+    label: String,
+    mode: StationSortMode,
+    selectedMode: StationSortMode,
+    onSortModeChanged: (StationSortMode) -> Unit,
+) {
+    FilterChip(
+        selected = selectedMode == mode,
+        onClick = { onSortModeChanged(mode) },
+        label = { Text(label) },
+    )
+}
+
+@Composable
 private fun StationCard(
     item: MimitStationDistance,
     selectedFuelType: String,
@@ -315,9 +478,9 @@ internal fun locationStatusTitle(status: NearbyLocationUiStatus?): String = when
 }
 
 internal fun locationStatusSubtitle(status: NearbyLocationUiStatus?): String = when (status) {
-    NearbyLocationUiStatus.AVAILABLE -> "Stazioni ordinate per distanza"
-    NearbyLocationUiStatus.PERMISSION_DENIED -> "Stazioni ordinate alfabeticamente"
-    NearbyLocationUiStatus.UNAVAILABLE -> "Stazioni ordinate alfabeticamente"
+    NearbyLocationUiStatus.AVAILABLE -> "Distanze disponibili per filtro e ordinamento"
+    NearbyLocationUiStatus.PERMISSION_DENIED -> "Il filtro raggio richiede la posizione"
+    NearbyLocationUiStatus.UNAVAILABLE -> "Il filtro raggio richiede la posizione"
     null -> "Verifica della posizione in corso"
 }
 

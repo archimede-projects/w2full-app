@@ -15,6 +15,8 @@ import com.archimede.w2full.data.repository.RoomVehicleSettingsRepository
 import com.archimede.w2full.data.repository.VehicleSettingsRepository
 import com.archimede.w2full.location.FusedUserLocationProvider
 import com.archimede.w2full.sync.MimitSyncScheduler
+import com.archimede.w2full.ui.stations.SharedPreferencesStationListPreferencesStore
+import com.archimede.w2full.ui.stations.StationListPreferencesStore
 
 class W2FullApplication : Application() {
     private val database by lazy { W2FullDatabase.getInstance(this) }
@@ -37,6 +39,10 @@ class W2FullApplication : Application() {
             ),
             logger = LogcatMimitLogger(),
         )
+    }
+
+    val stationListPreferencesStore: StationListPreferencesStore by lazy {
+        SharedPreferencesStationListPreferencesStore(this)
     }
 
     val priceHistoryRepository: PriceHistoryRepository by lazy {
