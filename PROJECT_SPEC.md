@@ -9,7 +9,7 @@
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **in corso**.
 - M7.1 — filtri/ordinamento Stazioni: **[x] chiusa e verificata sul Galaxy S25**.
-- M7.2 — preferiti nello Storico: **[~] candidato branch verificato; integrazione/Release pendenti**.
+- M7.2 — preferiti nello Storico: **[~] integrata su `main`, CI verde; Release RC e prova Galaxy S25 pendenti**.
 - M7.3 — confronto configurabile serie nello Storico: **richiesta e accodata; non iniziata finché M7.2 non è chiusa/provata**.
 
 ## Evidenza reale M5 su dispositivo
@@ -64,7 +64,7 @@ Il 4 settembre 2026 l'utente ha installato/provato la RC sul Samsung Galaxy S25 
 
 ## M7.2 — stazioni preferite nello Storico
 
-Stato: **[~] candidato branch verificato; integrazione/Release pendenti**.
+Stato: **[~] integrata su `main`, CI verde; Release RC e prova Galaxy S25 pendenti**.
 
 ### Obiettivo
 
@@ -100,17 +100,39 @@ Rendere lo Storico utile anche quando contiene molte stazioni lontane: l'utente 
 - test dedicati coprono store vuoto, persistenza multipla/rimozione, separazione senza perdita stazioni, fallback preferita, conservazione selezione e toggle della stazione selezionata;
 - regression test esistenti M3–M7.1 restano inclusi.
 
-### Evidenza branch candidata
+### Evidenze branch M7.2
 
-- Android CI run `33902789841`, job `101120543115`: **SUCCESS** completa;
-- `testDebugUnitTest`: **SUCCESS**;
-- `assembleDebug`: **SUCCESS**;
-- `apksigner`: **Verifies**, firma v2, un signer;
+- primo candidato funzionale run `33902789841`, job `101120543115`: **SUCCESS** completa;
+- candidato documentato `2c274458519392baeb6efc34b2ac3949409d276e`;
+- CI sul vero HEAD documentato run `33903014671`, job `101121279791`: **SUCCESS** completa;
+- `testDebugUnitTest`, `assembleDebug`, verifica APK/firma e upload artifact: tutti **SUCCESS**;
 - certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
 - public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- artifact `w2full-debug-apk`, ID `9948318368`, size archivio `14287141` byte, digest ZIP SHA-256 `840e058c34db05d7709e634712a6212469b1c199e25324e98fc274ae0e29e6c8`.
+- artifact del primo candidato `w2full-debug-apk`, ID `9948318368`, size archivio `14287141` byte, digest ZIP SHA-256 `840e058c34db05d7709e634712a6212469b1c199e25324e98fc274ae0e29e6c8`.
 
-M7.2 resta aperta finché il vero HEAD documentato non ha CI verde, il PR non è integrato su `main` con CI verde, le evidenze finali non sono registrate e non esiste una Release APK reale da provare sul Galaxy S25.
+### Integrazione `main` M7.2
+
+- PR `#8` — `feat(m7.2): add favorite history stations`;
+- merge **squash** con HEAD atteso `2c274458519392baeb6efc34b2ac3949409d276e`;
+- commit integrato su `main` `5a9bc5c717b71d8bae8994f3484ab928836104f5`;
+- Android CI reale di integrazione run `33903257045`, job `101122079944`: **SUCCESS** completa;
+- test JVM, build debug APK, verifica firma persistente e upload artifact: tutti **SUCCESS**.
+
+### Piano Release RC M7.2 autorizzato
+
+Obiettivo: produrre un APK reale installabile sul Galaxy S25, tag `v0.5.2-m7.2-rc1`, costruito dall'esatto commit finale di `main` dopo questo commit documentale pre-Release e dopo relativa CI verde.
+
+Il connettore GitHub disponibile non espone una mutazione diretta per creare tag. È quindi autorizzato **solo per questa Release RC** un bridge temporaneo sul branch dedicato `m7.2-release-rc1`:
+- il branch nasce dall'HEAD `main` da rilasciare;
+- `android-release.yml` sul branch temporaneo riceve un unico trigger push del branch oltre al comportamento tag e forza checkout/`target_commitish` all'esatto SHA finale `main`;
+- il job deve confermare con `git rev-parse HEAD` di stare costruendo lo SHA target;
+- la build deve eseguire test JVM, `assembleDebug`, verifica certificato/public key persistenti e pubblicare una vera GitHub prerelease `v0.5.2-m7.2-rc1`;
+- il tag creato dalla Release deve puntare direttamente allo SHA finale `main`;
+- dopo SUCCESS e verifica Release/tag/asset, il branch temporaneo viene riallineato all'HEAD finale `main`, rimuovendo ogni trigger temporaneo;
+- nessuna modifica temporanea del bridge entra in `main`;
+- il workflow permanente di `main` resta esclusivamente tag `v*`.
+
+M7.2 resta aperta finché la Release reale non esiste, asset/firma/hash/tag non sono verificati, le evidenze finali non sono registrate e il Galaxy S25 non ha una build concreta da provare.
 
 ## M7.3 — confronto configurabile serie nello Storico — richiesta
 
