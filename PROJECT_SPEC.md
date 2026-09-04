@@ -1,13 +1,14 @@
 # W2Full — Project Specification
 
-> **Fonte di verità del progetto.** Questa versione chiude M0–M5 e il checkpoint infrastrutturale di distribuzione GitHub Releases. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
+> **Fonte di verità del progetto.** Questa versione chiude M0–M5 e il checkpoint infrastrutturale di distribuzione GitHub Releases e apre il checkpoint M7.1 richiesto dall'utente. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
 
 ## Stato
 
 - M0–M5: **chiuse**.
 - Distribuzione GitHub Releases: **chiusa**.
 - M6 — notifiche soglia: **non iniziata**.
-- M7 — rifiniture: **non iniziata**.
+- M7 — rifiniture: **in corso; M7.1 filtri/ordinamento Stazioni autorizzata**.
+- M7.2 — preferiti nello Storico: **richiesta e accodata; non iniziata finché M7.1 non è chiusa**.
 
 ## M4 — integrazione MIMIT chiusa
 
@@ -136,9 +137,54 @@ Test coperti:
 - CI reale su `main` run `33887446442`, job `101070611480`: **SUCCESS**;
 - `testDebugUnitTest`, `assembleDebug`, verifica APK/firma e upload artifact: tutti **SUCCESS**;
 - firma persistente su APK integrato: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- artifact CI main `w2full-debug-apk`, ID `9942483998`, digest archivio SHA-256 `887925f389c310b000514cc8e59d2a4009c5019361a340b38b6e64fa5cb9d27f`.
+- artifact CI main `w2full-debug-apk`, ID `9942483998`, digest archivio SHA-256 `887925f389c310b000514cc8e59d2a4009c5019361a340b38b6e64fa5cb9d27f`;
+- commit documentale finale `1eb6f5ab3b4a248e30e7a693ac0bc62ac311bffa`, CI run `33887752052`, job `101071620632`: **SUCCESS**;
+- Release reale di prova `v0.5.0-m5-rc1`, target/tag diretto `1eb6f5ab3b4a248e30e7a693ac0bc62ac311bffa`, Release run `33890959597`, job `101082219282`: **SUCCESS**;
+- APK `w2full-v0.5.0-m5-rc1-debug.apk`, SHA-256 `4768319aecf910875cdabc5f020595434aeebb4bb09c32529902f4754a685806`;
+- verifica reale su Samsung Galaxy S25 confermata dall'utente il 4 settembre 2026: installazione aggiornamento, schermata Stazioni e nuova schermata Storico **PASS**.
 
-Il branch `m5-price-history` deve essere riallineato al commit documentale finale di `main` dopo la verifica della relativa CI; non viene dichiarato cancellato.
+## M7.1 — filtri e ordinamento schermata Stazioni
+
+Stato: **[~] autorizzata; spec fissata prima del codice**.
+
+### Obiettivo
+
+Permettere all'utente di limitare la lista delle stazioni Eni a un raggio massimo configurabile e di scegliere l'ordinamento per distanza oppure per prezzo del carburante correntemente selezionato dall'impostazione Veicolo, mantenendo invariati download MIMIT, cache, storico e calcolo distanze M4/M5.
+
+### Contratto UI e comportamento
+
+- branch di lavoro `m7-station-filters`, derivato dall'HEAD `main` `1eb6f5ab3b4a248e30e7a693ac0bc62ac311bffa`;
+- nuova card `Filtri` nella schermata Stazioni, dopo lo stato posizione e prima dell'elenco;
+- filtro raggio opzionale: comportamento predefinito `Nessun limite`, così l'aggiornamento non nasconde stazioni finché l'utente non abilita il filtro;
+- quando abilitato, l'utente imposta un raggio intero da `1` a `200` km; il valore iniziale proposto è `20` km;
+- il raggio viene applicato solo quando la posizione è disponibile; con posizione negata/non disponibile la preferenza resta salvata ma il filtro raggio non viene applicato e la UI lo segnala;
+- con posizione disponibile e filtro attivo, stazioni con distanza nulla o distanza maggiore del limite vengono escluse perché non è possibile garantire che siano entro il raggio;
+- ordinamento selezionabile con tre modalità: `Distanza`, `Prezzo Self`, `Prezzo Servito`;
+- `Distanza` resta il default e conserva la semantica M4: distanza crescente; distanze mancanti in fondo; in assenza posizione fallback alfabetico già esistente;
+- `Prezzo Self`: prezzo Self crescente per il carburante correntemente selezionato; prezzi Self mancanti in fondo; a parità di prezzo tie-break per distanza e poi identificativo stazione;
+- `Prezzo Servito`: stessa regola usando il prezzo Servito;
+- il filtro raggio viene applicato prima dell'ordinamento;
+- le preferenze raggio/ordinamento sono esclusivamente locali e persistono tra riavvii dell'app tramite storage privato Android; nessun account/cloud;
+- la card mostra un riepilogo del numero di stazioni visualizzate rispetto al totale disponibile;
+- nessuna modifica al refresh MIMIT, alla cache Room, allo storico M5, al filtro bandiera Eni o al `defaultFuelType` del veicolo;
+- `versionCode = 8`, `versionName = 0.5.1-m7.1`;
+- M7.2 preferiti Storico, M6 notifiche e pulsante Indicazioni restano fuori scope di questo checkpoint.
+
+### Test obbligatori M7.1
+
+- funzione pura filtro/ordinamento: nessun limite + distanza conserva l'ordine atteso;
+- raggio attivo con posizione disponibile esclude fuori-raggio e distanza nulla;
+- raggio attivo con posizione non disponibile non filtra la lista;
+- ordinamento prezzo Self crescente, prezzo mancante in fondo e tie-break distanza;
+- ordinamento prezzo Servito equivalente;
+- validazione raggio accetta solo `1..200` e conserva un valore valido precedente in caso di input non valido;
+- regression test M3–M5 tutti verdi;
+- CI reale sul branch con `testDebugUnitTest`, `assembleDebug`, verifica firma persistente e artifact **SUCCESS**;
+- prima di chiudere M7.1: PR/integration su `main`, CI reale main **SUCCESS**, aggiornamento evidenze spec e APK Release reale da provare sul Galaxy S25.
+
+## M7.2 — preferiti nello Storico — richiesta
+
+Richiesta già autorizzata dall'utente, ma non viene implementata finché M7.1 non è chiusa. Obiettivo preliminare: poter marcare stazioni come preferite e trovarle/monitorarle prioritariamente nella schermata Storico, mantenendo comunque accessibili le altre stazioni. Il contratto tecnico dettagliato verrà fissato in `PROJECT_SPEC.md` prima del relativo codice.
 
 ## Requisito futuro già approvato
 
@@ -146,4 +192,4 @@ M7: pulsante `Indicazioni` su ogni stazione, tramite intent verso Google Maps/ap
 
 ## Regola di avanzamento
 
-M6 e milestone successive non partono senza nuova autorizzazione esplicita dell'utente.
+Un checkpoint alla volta. M7.1 è autorizzata; M7.2 è già richiesta ma parte solo dopo chiusura M7.1. M6 notifiche soglia resta non iniziata finché non viene esplicitamente autorizzata come obiettivo attivo.
