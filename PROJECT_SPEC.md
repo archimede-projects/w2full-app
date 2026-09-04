@@ -9,7 +9,7 @@
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **in corso**.
 - M7.1 — filtri/ordinamento Stazioni: **[x] chiusa e verificata sul Galaxy S25**.
-- M7.2 — preferiti nello Storico: **[~] autorizzata; contratto fissato prima del codice**.
+- M7.2 — preferiti nello Storico: **[~] candidato branch verificato; integrazione/Release pendenti**.
 - M7.3 — confronto configurabile serie nello Storico: **richiesta e accodata; non iniziata finché M7.2 non è chiusa/provata**.
 
 ## Evidenza reale M5 su dispositivo
@@ -64,7 +64,7 @@ Il 4 settembre 2026 l'utente ha installato/provato la RC sul Samsung Galaxy S25 
 
 ## M7.2 — stazioni preferite nello Storico
 
-Stato: **[~] autorizzata; spec fissata prima del codice**.
+Stato: **[~] candidato branch verificato; integrazione/Release pendenti**.
 
 ### Obiettivo
 
@@ -73,29 +73,44 @@ Rendere lo Storico utile anche quando contiene molte stazioni lontane: l'utente 
 ### Contratto UI e comportamento
 
 - branch di lavoro `m7-history-favorites`, derivato dall'HEAD `main` `67ad7fd46c2a83d74e56d85358599d994187bbe1`;
+- contratto spec-first commit `19a6f7ecad648f4da841fb9dda780bfbffa0a1f1`;
 - i preferiti sono identificati esclusivamente da `stationId` MIMIT;
 - storage esclusivamente locale tramite `SharedPreferences` private Android; nessun account/cloud e nessuna migrazione Room;
 - nella schermata `Storico` la stazione selezionata espone un controllo esplicito `☆ Aggiungi ai preferiti` / `★ Preferita`;
-- il toggle deve essere immediato, persistente e non modificare cache/storico MIMIT;
+- il toggle è immediato, persistente e non modifica cache/storico MIMIT;
 - il selettore stazioni distingue chiaramente `Preferite` e `Altre stazioni` quando esiste almeno un preferito;
 - i chip delle preferite mostrano il marker `★` e restano selezionabili come gli altri;
-- le stazioni non preferite restano sempre accessibili: nessun filtro distruttivo o nascondimento permanente;
+- le stazioni non preferite restano sempre accessibili;
 - al primo ingresso/riavvio, se la selezione corrente non è più valida e ci sono preferiti, viene selezionata per prima una stazione preferita; in assenza preferiti resta il fallback M5 alla prima stazione disponibile;
-- aggiungere/rimuovere un preferito non deve azzerare la selezione corrente né cambiare carburante/servizio se la stessa stazione resta selezionata;
-- se una stazione preferita non è più presente tra quelle con storico, il suo ID può restare memorizzato ma non viene mostrato finché non ricompare;
+- aggiungere/rimuovere un preferito non azzera la selezione corrente né cambia carburante/servizio se la stessa stazione resta selezionata;
+- se una stazione preferita non è più presente tra quelle con storico, il suo ID resta memorizzabile ma non viene mostrato finché non ricompare;
 - `versionCode = 9`, `versionName = 0.5.2-m7.2`;
 - nessuna modifica al grafico/serie M5 durante M7.2;
 - M7.3, M6 e pulsante `Indicazioni` restano fuori scope di questo checkpoint.
 
-### Test obbligatori M7.2
+### Implementazione e test M7.2
 
-- store preferiti: load vuoto, save/load multipli, toggle persistente e rimozione;
-- ordinamento/presentazione: preferite separate dalle altre senza perdere stazioni;
-- risoluzione selezione: preferita prima quando non c'è selezione valida; selezione corrente valida mantenuta anche se non preferita;
-- toggle della stazione selezionata non altera stationId selezionato;
-- regression test M3–M7.1 tutti verdi;
-- CI reale branch con `testDebugUnitTest`, `assembleDebug`, verifica firma persistente e artifact **SUCCESS**;
-- prima della chiusura: PR/integration su `main`, CI `main` **SUCCESS**, evidenze spec e Release APK reale da provare sul Galaxy S25.
+- commit funzionale `992b42f1b7a74b8e47d0e2f82ea2e18c8702baae` — `feat(m7.2): add favorite history stations`;
+- nuovo `HistoryFavoriteStationsStore` con implementazione `SharedPreferences` privata;
+- funzioni pure per raggruppamento preferite/altre, risoluzione selezione e toggle set preferiti;
+- `PriceHistoryViewModel` carica i preferiti all'avvio, conserva la selezione valida e persiste il toggle;
+- `PriceHistoryScreen` mostra sezione `Preferite`, `Altre stazioni`, marker `★` e controllo `☆/★` sulla stazione selezionata;
+- `W2FullApplication` espone lo store locale senza modificare Room;
+- CI ordinaria modificata esclusivamente per aggiungere `m7-history-favorites` ai branch trigger; nessuna versione/action CI aggiornata;
+- test dedicati coprono store vuoto, persistenza multipla/rimozione, separazione senza perdita stazioni, fallback preferita, conservazione selezione e toggle della stazione selezionata;
+- regression test esistenti M3–M7.1 restano inclusi.
+
+### Evidenza branch candidata
+
+- Android CI run `33902789841`, job `101120543115`: **SUCCESS** completa;
+- `testDebugUnitTest`: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- `apksigner`: **Verifies**, firma v2, un signer;
+- certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact `w2full-debug-apk`, ID `9948318368`, size archivio `14287141` byte, digest ZIP SHA-256 `840e058c34db05d7709e634712a6212469b1c199e25324e98fc274ae0e29e6c8`.
+
+M7.2 resta aperta finché il vero HEAD documentato non ha CI verde, il PR non è integrato su `main` con CI verde, le evidenze finali non sono registrate e non esiste una Release APK reale da provare sul Galaxy S25.
 
 ## M7.3 — confronto configurabile serie nello Storico — richiesta
 
