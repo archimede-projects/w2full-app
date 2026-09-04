@@ -476,9 +476,9 @@ internal fun locationStatusTitle(status: NearbyLocationUiStatus?): String = when
 }
 
 internal fun locationStatusSubtitle(status: NearbyLocationUiStatus?): String = when (status) {
-    NearbyLocationUiStatus.AVAILABLE -> "Distanze disponibili per filtro e ordinamento"
-    NearbyLocationUiStatus.PERMISSION_DENIED -> "Il filtro raggio richiede la posizione"
-    NearbyLocationUiStatus.UNAVAILABLE -> "Il filtro raggio richiede la posizione"
+    NearbyLocationUiStatus.AVAILABLE -> "Stazioni ordinate per distanza"
+    NearbyLocationUiStatus.PERMISSION_DENIED -> "Stazioni ordinate alfabeticamente"
+    NearbyLocationUiStatus.UNAVAILABLE -> "Stazioni ordinate alfabeticamente"
     null -> "Verifica della posizione in corso"
 }
 
