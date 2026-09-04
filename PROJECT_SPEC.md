@@ -11,7 +11,7 @@
 - M7.1 — filtri/ordinamento Stazioni: **chiusa e verificata su Galaxy S25**.
 - M7.2 — preferiti stazioni RC1/RC2: **FAIL funzionale su Galaxy S25; comportamento sostituito dal contratto M7.4**.
 - M7.3 — grafico Storico configurabile multi-serie: **requisito assorbito nel contratto M7.4**.
-- M7.4 — redesign UX Stazioni + Storico + Impostazioni: **checkpoint attivo; candidato branch tecnicamente verde, da integrare/rilasciare/provare**.
+- M7.4 — redesign UX Stazioni + Storico + Impostazioni: **integrata su `main`, CI `main` verde; RC1 in preparazione, poi prova reale Galaxy S25**.
 
 ## Evidenza RC2 non accettata
 
@@ -195,9 +195,40 @@ Candidato branch validato:
 - public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
 - artifact `w2full-debug-apk`, ID `9952067743`, digest ZIP SHA-256 `f9f47a0d3893bf82ff2b0cbf84447c8e820a55a4d06c17228dd89269709e2aae`, size archivio `14512754` byte.
 
-Il commit documentale che contiene queste evidenze deve a sua volta superare la CI prima dell'apertura/merge del PR.
+Vero HEAD documentato prima del PR:
+- commit `8bfd792148eb21b0d10704644b0737d671a73cd2`;
+- Android CI run `33913117519`, job `101154019344`: **SUCCESS** completa.
 
-## 9. Fuori scope
+## 9. Integrazione `main` e piano Release RC1
+
+PR #10 `feat(m7.4): redesign stations history and settings` integrata con **squash** bloccando l'HEAD a `8bfd792148eb21b0d10704644b0737d671a73cd2`.
+
+Commit di integrazione `main`:
+- `fb7be8efe2606880e1d0a2fccfca8d3c781f1b46`;
+- Android CI run `33914292735`, job `101157755552`: **SUCCESS**;
+- `testDebugUnitTest`: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- `apksigner`: **Verifies**, schema v2, un signer;
+- certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact CI ID `9952603541`, digest ZIP SHA-256 `588907336b6d0c307c5fbda35b42fb44faec4d3d829cb011d72ae5ad5342dff7`.
+
+Prima della RC1 viene rimosso da `.github/workflows/android-ci.yml` il trigger temporaneo `m7-stations-history-ux`; nessun'altra manutenzione CI è autorizzata in questo checkpoint. Il commit risultante deve superare una nuova Android CI su `main` e diventa lo SHA sorgente esatto della RC1.
+
+Tag RC previsto: `v0.5.3-m7.4-rc1`.
+
+Il connettore GitHub disponibile in questa sessione non espone una mutazione diretta per creare tag Git. È quindi autorizzato **esclusivamente per questa RC1** un bridge one-shot su branch `m7.4-release-rc1`, senza modificare il workflow permanente di `main`:
+- il branch parte dall'esatto SHA finale `main` validato dopo il cleanup del trigger CI;
+- solo la copia branch di `.github/workflows/android-release.yml` aggiunge un trigger push sul branch bridge e imposta `RELEASE_TAG=v0.5.3-m7.4-rc1`;
+- checkout, test, build e firma devono usare **l'esatto SHA finale `main`**, non il commit temporaneo del bridge;
+- `softprops/action-gh-release` deve creare il tag `v0.5.3-m7.4-rc1` con `target_commitish` uguale allo stesso SHA finale `main` e pubblicare il vero APK come asset Release;
+- certificato e public key devono coincidere con i digest persistenti normativi;
+- dopo Release verde, `m7.4-release-rc1` viene riallineato allo SHA sorgente `main`, eliminando dal suo stato finale il trigger temporaneo;
+- `.github/workflows/android-release.yml` su `main` resta **tag-only** per tutto il processo.
+
+M7.4 resta aperta anche dopo la RC1: la chiusura richiede la prova reale Galaxy S25 dell'utente.
+
+## 10. Fuori scope
 
 - M6 notifiche soglia;
 - pulsante `Indicazioni` issue #1, requisito futuro già approvato;
