@@ -1,14 +1,14 @@
 # W2Full — Project Specification
 
-> **Fonte di verità del progetto.** Questa versione chiude M4 e gestisce esclusivamente il checkpoint infrastrutturale di distribuzione GitHub Releases, separato da M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
+> **Fonte di verità del progetto.** Questa versione chiude M4 e il checkpoint infrastrutturale di distribuzione GitHub Releases, mantenuto separato da M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
 
 ## Stato
 
 - M0–M4: **chiuse**.
+- Distribuzione GitHub Releases: **chiusa**.
 - M5 — storico prezzi + grafico: **non iniziata**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **non iniziata**.
-- Distribuzione GitHub Releases: validazione branch **completata**, cleanup temporaneo **completato**, integrazione su `main` ancora da verificare.
 
 ## M4 — integrazione MIMIT chiusa
 
@@ -47,31 +47,34 @@ Integrazione pulita:
 
 Certificato persistente atteso e verificato lungo M4: SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`; public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
 
-## Checkpoint distribuzione GitHub Releases — contratto di chiusura
+## Distribuzione GitHub Releases — chiusa
 
-Questo intervento è esclusivamente infrastrutturale. Non introduce funzionalità M5 e non modifica comportamento, dati o UI dell'app.
+Questo intervento è stato esclusivamente infrastrutturale. Non ha introdotto funzionalità M5 e non ha modificato comportamento, dati o UI dell'app.
 
-Base di lavoro:
-- branch pulito `release-distribution-clean` creato dall'HEAD di `main` `3abd465cd9f049bc45b552a68d174f3d83b75191`;
-- il vecchio branch divergente `release-distribution` non deve essere mergeato in `main`;
-- a chiusura, il checkpoint legacy deve essere riallineato al commit finale verificato, senza trascinare la sua vecchia storia nel merge funzionale.
+### Workflow permanente
 
-Workflow permanente richiesto:
-- unico file permanente da integrare: `.github/workflows/android-release.yml`;
+Il tree finale di `main` contiene:
+- `.github/workflows/android-ci.yml` invariato rispetto al checkpoint precedente;
+- `.github/workflows/android-release.yml` come unico workflow di distribuzione.
+
+Contratto permanente verificato:
 - trigger esclusivamente su `push` di tag `v*`;
-- nessun `workflow_call` permanente;
+- nessun `workflow_call`;
 - nessun `workflow_dispatch` per pubblicare APK;
+- nessun `.github/workflows/bootstrap-preview-release.yml` o altro bootstrap Release;
 - checkout del commit realmente taggato;
 - test JVM `testDebugUnitTest` prima della build;
 - build `assembleDebug`;
-- uso obbligatorio del keystore debug persistente via secrets: se un secret di firma manca, la Release deve fallire;
+- uso obbligatorio del keystore debug persistente via secrets: se un secret di firma manca, la Release fallisce;
 - verifica con `apksigner` del certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265` e della public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
 - APK versionato come `w2full-<tag>-debug.apk`;
 - calcolo SHA-256 dell'APK e pubblicazione del digest nel corpo della GitHub Release;
 - APK distribuito esclusivamente come asset di una vera GitHub Release.
 
-Validazione prima dell'integrazione:
-- commit di validazione: `c3567b4b7afb7f37651784842460a41a94bc8efc` — `chore(release): validate distribution workflow`;
+### Validazione Release reale
+
+Validazione eseguita prima dell'integrazione:
+- commit di validazione `c3567b4b7afb7f37651784842460a41a94bc8efc` — `chore(release): validate distribution workflow`;
 - run `33884215157`, job `101059934737`: **SUCCESS**;
 - test JVM: **SUCCESS**;
 - `assembleDebug`: **SUCCESS**;
@@ -80,14 +83,19 @@ Validazione prima dell'integrazione:
 - Release reale `v0.4.0-rc1-distcheck1`, prerelease, target commit `c3567b4b7afb7f37651784842460a41a94bc8efc`;
 - asset `w2full-v0.4.0-rc1-distcheck1-debug.apk`;
 - APK SHA-256 `616ea026b3d3e80ab7e7e865df624a7df088479f9ecc4838015d2b14f8d846ef`;
-- cleanup del trigger branch/logica temporanea: commit `985f70f5d8df01c7ea97e0d13856595f8ef18cf6` — `ci(release): finalize tag-only release workflow`;
-- tree branch dopo cleanup: presenti solo `android-ci.yml` e `android-release.yml`; nessun bootstrap Release.
+- cleanup del trigger/logica temporanea eseguito nel branch prima dell'integrazione.
 
-Il checkpoint resta aperto fino alla CI reale su `main` del commit integrato e al successivo commit documentale di chiusura.
+### Integrazione finale
 
-## Isolamento distribuzione
+- PR `#5` — `ci: finalize GitHub Releases distribution`;
+- merge eseguito con **squash**, così la storia temporanea di validazione non entra nella storia lineare di `main`;
+- commit integrato su `main`: `99803fd1ac1af01622d39ab406833a81bebc3a1b` — `ci: finalize GitHub Releases distribution`;
+- parent diretto: `3abd465cd9f049bc45b552a68d174f3d83b75191`;
+- CI reale di integrazione su `main`: run `33884796836`, job `101061834450`: **SUCCESS**;
+- nella CI di integrazione: test JVM, build APK, verifica firma persistente e upload artifact tutti **SUCCESS**;
+- log CI integrazione: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
 
-M5 resta esplicitamente bloccata durante questo intervento. `android-release.yml` può essere integrato su `main` solo dopo la validazione e il cleanup sopra documentati.
+Il vecchio branch/checkpoint `release-distribution` non è stato mergeato. Dopo la verifica della CI del presente commit documentale, i branch di distribuzione devono essere riallineati al commit finale di `main`, senza dichiararli cancellati.
 
 ## Requisito futuro già approvato
 
@@ -95,4 +103,4 @@ M7: pulsante `Indicazioni` su ogni stazione, tramite intent verso Google Maps/ap
 
 ## Regola di avanzamento
 
-Nessuna M5 o milestone successiva parte senza nuova autorizzazione esplicita dell'utente.
+M5 resta **non iniziata**. Nessuna M5 o milestone successiva parte senza nuova autorizzazione esplicita dell'utente.
