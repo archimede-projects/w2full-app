@@ -15,6 +15,7 @@ on:
       - m4-vehicle-fuel-setting
       - m4-integration-candidate
       - m4-integration-clean
+      - m5-price-history
   workflow_dispatch:
 
 permissions:

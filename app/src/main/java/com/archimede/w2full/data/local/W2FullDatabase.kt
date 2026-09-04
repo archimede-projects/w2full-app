@@ -13,9 +13,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RifornimentoEntity::class,
         MimitStationEntity::class,
         MimitPriceEntity::class,
+        MimitPriceHistoryEntity::class,
         MimitSyncStateEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class W2FullDatabase : RoomDatabase() {
@@ -77,6 +78,30 @@ abstract class W2FullDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `mimit_price_history` (
+                        `station_id` INTEGER NOT NULL,
+                        `fuel_description` TEXT NOT NULL,
+                        `price_milli_euro_per_unit` INTEGER NOT NULL,
+                        `is_self` INTEGER NOT NULL,
+                        `communicated_at` TEXT NOT NULL,
+                        `imported_at_epoch_millis` INTEGER NOT NULL,
+                        PRIMARY KEY(`station_id`, `fuel_description`, `is_self`, `communicated_at`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS `idx_mimit_price_history_station_fuel_service`
+                    ON `mimit_price_history` (`station_id`, `fuel_description`, `is_self`, `communicated_at`)
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: W2FullDatabase? = null
 
@@ -87,7 +112,7 @@ abstract class W2FullDatabase : RoomDatabase() {
                     W2FullDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }

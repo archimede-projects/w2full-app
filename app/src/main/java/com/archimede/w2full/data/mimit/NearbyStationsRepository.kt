@@ -3,6 +3,7 @@ package com.archimede.w2full.data.mimit
 import androidx.room.withTransaction
 import com.archimede.w2full.data.local.MimitCacheDao
 import com.archimede.w2full.data.local.MimitPriceEntity
+import com.archimede.w2full.data.local.MimitPriceHistoryEntity
 import com.archimede.w2full.data.local.MimitStationEntity
 import com.archimede.w2full.data.local.MimitSyncStateEntity
 import com.archimede.w2full.data.local.VehicleDao
@@ -110,6 +111,7 @@ class RoomNearbyStationsRepository(
             val stationEntities = eniStations.map { it.toEntity() }
             val priceEntities = eniPrices.map { it.toEntity() }
             val successfulAt = clock.millis()
+            val historyEntities = eniPrices.map { it.toHistoryEntity(successfulAt) }
             val syncState = MimitSyncStateEntity(
                 stationsExtractionEpochDay = stationDataset.extractionDate.toEpochDay(),
                 pricesExtractionEpochDay = priceDataset.extractionDate.toEpochDay(),
@@ -117,6 +119,7 @@ class RoomNearbyStationsRepository(
             )
 
             database.withTransaction {
+                cacheDao.insertPriceHistory(historyEntities)
                 cacheDao.clearPrices()
                 cacheDao.clearStations()
                 cacheDao.clearSyncState()
@@ -235,6 +238,16 @@ class RoomNearbyStationsRepository(
         isSelf = isSelf,
         communicatedAt = communicatedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
     )
+
+    private fun MimitPrice.toHistoryEntity(importedAtEpochMillis: Long): MimitPriceHistoryEntity =
+        MimitPriceHistoryEntity(
+            stationId = stationId,
+            fuelDescription = fuelDescription,
+            priceMilliEuroPerUnit = priceMilliEuroPerUnit,
+            isSelf = isSelf,
+            communicatedAt = communicatedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            importedAtEpochMillis = importedAtEpochMillis,
+        )
 
     private fun MimitPriceEntity.toModel(): MimitPrice = MimitPrice(
         stationId = stationId,
