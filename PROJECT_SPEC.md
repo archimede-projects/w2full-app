@@ -1,12 +1,12 @@
 # W2Full — Project Specification
 
-> **Fonte di verità del progetto.** Questa versione chiude M4 e il checkpoint infrastrutturale di distribuzione GitHub Releases, mantenuto separato da M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
+> **Fonte di verità del progetto.** Questa versione chiude M4 e il checkpoint infrastrutturale di distribuzione GitHub Releases e apre M5. Restano normativi tutti i requisiti M0–M3 presenti nel precedente `PROJECT_SPEC.md` al commit `749f9e44646113fb0c115c9a6685c73beee00b77` e tutti i contratti/evidenze M4 documentati nel candidato verificato al commit `69b4259e855ea35eb9dac1ab5112290837a45933`, salvo quanto esplicitamente modificato qui.
 
 ## Stato
 
 - M0–M4: **chiuse**.
 - Distribuzione GitHub Releases: **chiusa**.
-- M5 — storico prezzi + grafico: **non iniziata**.
+- M5 — storico prezzi + grafico: **in corso**.
 - M6 — notifiche soglia: **non iniziata**.
 - M7 — rifiniture: **non iniziata**.
 
@@ -93,9 +93,46 @@ Validazione eseguita prima dell'integrazione:
 - parent diretto: `3abd465cd9f049bc45b552a68d174f3d83b75191`;
 - CI reale di integrazione su `main`: run `33884796836`, job `101061834450`: **SUCCESS**;
 - nella CI di integrazione: test JVM, build APK, verifica firma persistente e upload artifact tutti **SUCCESS**;
-- log CI integrazione: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
+- log CI integrazione: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- commit documentale finale `200b32d708cc1850564e5d08496a3234e1c9ea79`, con CI run `33885088932`, job `101062798425`: **SUCCESS**;
+- `release-distribution` e `release-distribution-clean` riallineati a `200b32d708cc1850564e5d08496a3234e1c9ea79`.
 
-Il vecchio branch/checkpoint `release-distribution` non è stato mergeato. Dopo la verifica della CI del presente commit documentale, i branch di distribuzione devono essere riallineati al commit finale di `main`, senza dichiararli cancellati.
+## M5 — storico prezzi + grafico
+
+Stato: **[~] in corso**.
+
+### Obiettivo
+
+Conservare localmente, tra refresh MIMIT successivi, le osservazioni di prezzo delle stazioni Eni e permettere di consultare l'andamento cronologico di una stazione/carburante/modalità di servizio. M5 non introduce notifiche, soglie o nuovi download esterni rispetto al flusso MIMIT già esistente.
+
+### Decisioni tecniche fissate prima del codice
+
+- branch di lavoro: `m5-price-history`, derivato dall'HEAD `main` `200b32d708cc1850564e5d08496a3234e1c9ea79`;
+- Room passa da schema `2` a `3` con migrazione esplicita `2→3` e senza migrazione distruttiva;
+- la tabella `mimit_prices` resta la cache corrente usata da M4: continua a essere sostituita atomicamente a ogni refresh;
+- nuova tabella append-only `mimit_price_history`, indipendente dalla cancellazione della cache corrente;
+- chiave logica/primaria dello storico: `station_id`, `fuel_description`, `is_self`, `communicated_at`; il medesimo record MIMIT importato più volte non crea duplicati;
+- lo storico conserva inoltre `price_milli_euro_per_unit` e `imported_at_epoch_millis`;
+- durante ogni refresh riuscito, le righe prezzo Eni validate vengono inserite nello storico con `INSERT OR IGNORE` nella stessa transazione che aggiorna la cache corrente;
+- nessuna foreign key dallo storico verso `mimit_stations`, così una stazione non presente nella cache corrente non perde la propria serie storica;
+- query storico ordinate cronologicamente per `communicated_at`, con filtro esatto per stazione/carburante/modalità;
+- UI: nuova destinazione bottom-nav `Storico`;
+- selezione iniziale: prima stazione Eni disponibile; carburante iniziale uguale al `defaultFuelType` del veicolo quando presente nello storico, altrimenti primo carburante disponibile; modalità iniziale `Self` quando disponibile, altrimenti `Servito`;
+- grafico lineare realizzato con `androidx.compose.foundation.Canvas`, senza dipendenze chart aggiuntive. Vico è stato rivalutato in M5 ma non introdotto: la linea 3.x corrente usa l'asse Compose Multiplatform/JetBrains, mentre W2Full resta sulla toolchain AndroidX Compose già verificata;
+- il grafico deve gestire 0, 1 o più punti senza crash: empty state esplicito, punto singolo visibile, più punti collegati in ordine cronologico;
+- sotto il grafico viene mostrato l'elenco cronologico inverso con data comunicazione e prezzo €/l;
+- `versionCode = 7`, `versionName = 0.5.0-m5`;
+- M6/M7 restano fuori scope.
+
+### Test obbligatori
+
+- migrazione Room `2→3` preserva tabelle/dati M3-M4 e crea lo storico;
+- DAO: inserimento storico deduplicato e query filtrata/ordinata;
+- repository refresh: un refresh aggiunge storico, refresh identico non duplica, refresh successivo con nuova comunicazione aggiunge un nuovo punto;
+- regression test M3/M4 esistenti tutti verdi;
+- test puri della trasformazione serie grafico/empty-single-multiple;
+- CI branch reale con test JVM, `assembleDebug`, verifica firma persistente e artifact **SUCCESS**;
+- prima di chiudere M5: integrazione su `main`, CI reale su `main` **SUCCESS**, aggiornamento delle evidenze in questa spec e riallineamento branch M5 al commit finale.
 
 ## Requisito futuro già approvato
 
@@ -103,4 +140,4 @@ M7: pulsante `Indicazioni` su ogni stazione, tramite intent verso Google Maps/ap
 
 ## Regola di avanzamento
 
-M5 resta **non iniziata**. Nessuna M5 o milestone successiva parte senza nuova autorizzazione esplicita dell'utente.
+M6 e milestone successive non partono senza nuova autorizzazione esplicita dell'utente.
