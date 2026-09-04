@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 data class PriceHistoryUiState(
     val stations: List<PriceHistoryStation> = emptyList(),
     val selectedStationId: Long? = null,
+    val favoriteStationIds: Set<Long> = emptySet(),
     val fuelTypes: List<String> = emptyList(),
     val selectedFuelType: String? = null,
     val serviceModes: List<Boolean> = emptyList(),
@@ -27,8 +28,13 @@ data class PriceHistoryUiState(
 
 class PriceHistoryViewModel(
     private val repository: PriceHistoryRepository,
+    private val favoriteStationsStore: HistoryFavoriteStationsStore,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(PriceHistoryUiState())
+    private val _uiState = MutableStateFlow(
+        PriceHistoryUiState(
+            favoriteStationIds = favoriteStationsStore.load(),
+        ),
+    )
     val uiState: StateFlow<PriceHistoryUiState> = _uiState.asStateFlow()
 
     private var fuelJob: Job? = null
@@ -42,12 +48,14 @@ class PriceHistoryViewModel(
                 repository.observeDefaultFuelType(),
             ) { stations, defaultFuel -> stations to defaultFuel }
                 .collectLatest { (stations, defaultFuel) ->
-                    val currentStation = _uiState.value.selectedStationId
-                    val resolvedStation = currentStation
-                        ?.takeIf { selected -> stations.any { it.stationId == selected } }
-                        ?: stations.firstOrNull()?.stationId
+                    val currentState = _uiState.value
+                    val resolvedStation = resolveHistoryStationSelection(
+                        currentStationId = currentState.selectedStationId,
+                        stations = stations,
+                        favoriteStationIds = currentState.favoriteStationIds,
+                    )
 
-                    _uiState.value = _uiState.value.copy(
+                    _uiState.value = currentState.copy(
                         stations = stations,
                         selectedStationId = resolvedStation,
                         defaultFuelType = defaultFuel,
@@ -68,6 +76,17 @@ class PriceHistoryViewModel(
             points = emptyList(),
         )
         observeFuelTypes(stationId, _uiState.value.defaultFuelType)
+    }
+
+    fun toggleFavorite(stationId: Long) {
+        val state = _uiState.value
+        if (state.stations.none { it.stationId == stationId }) return
+        val updatedFavorites = toggledHistoryFavoriteStationIds(
+            current = state.favoriteStationIds,
+            stationId = stationId,
+        )
+        favoriteStationsStore.save(updatedFavorites)
+        _uiState.value = state.copy(favoriteStationIds = updatedFavorites)
     }
 
     fun selectFuelType(fuelType: String) {
@@ -167,11 +186,12 @@ class PriceHistoryViewModel(
 
     class Factory(
         private val repository: PriceHistoryRepository,
+        private val favoriteStationsStore: HistoryFavoriteStationsStore,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(PriceHistoryViewModel::class.java))
-            return PriceHistoryViewModel(repository) as T
+            return PriceHistoryViewModel(repository, favoriteStationsStore) as T
         }
     }
 }
