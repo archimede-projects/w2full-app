@@ -27,16 +27,12 @@ class FusedUserLocationProvider(
         }
 
         return try {
-            val location = requestCurrentLocation()
+            val location = requestCurrentLocation() ?: requestLastLocation()
             if (location == null) {
                 UserLocationResult.Unavailable
             } else {
                 val point = runCatching { GeoPoint(location.latitude, location.longitude) }.getOrNull()
-                if (point == null) {
-                    UserLocationResult.Unavailable
-                } else {
-                    UserLocationResult.Available(point)
-                }
+                if (point == null) UserLocationResult.Unavailable else UserLocationResult.Available(point)
             }
         } catch (_: SecurityException) {
             UserLocationResult.PermissionDenied
@@ -59,20 +55,32 @@ class FusedUserLocationProvider(
         continuation.invokeOnCancellation { cancellationSource.cancel() }
 
         fusedLocationClient
-            .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cancellationSource.token)
+            .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellationSource.token)
             .addOnSuccessListener { location ->
-                if (continuation.isActive) {
-                    continuation.resume(location)
-                }
+                if (continuation.isActive) continuation.resume(location)
             }
             .addOnFailureListener { error ->
-                if (continuation.isActive) {
-                    continuation.resumeWithException(error)
-                }
+                if (continuation.isActive) continuation.resumeWithException(error)
             }
             .addOnCanceledListener {
                 if (continuation.isActive) {
                     continuation.cancel(CancellationException("Location request cancelled"))
+                }
+            }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun requestLastLocation(): Location? = suspendCancellableCoroutine { continuation ->
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location ->
+                if (continuation.isActive) continuation.resume(location)
+            }
+            .addOnFailureListener { error ->
+                if (continuation.isActive) continuation.resumeWithException(error)
+            }
+            .addOnCanceledListener {
+                if (continuation.isActive) {
+                    continuation.cancel(CancellationException("Last location request cancelled"))
                 }
             }
     }

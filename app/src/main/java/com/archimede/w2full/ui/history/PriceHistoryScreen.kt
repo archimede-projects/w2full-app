@@ -1,6 +1,5 @@
 package com.archimede.w2full.ui.history
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,9 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -152,6 +148,7 @@ private fun PriceHistoryScreen(
                 labelA = labelA,
                 labelB = labelB,
                 seriesBEnabled = state.seriesBEnabled,
+                resetKey = state.period,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
 
@@ -281,6 +278,7 @@ private fun HistoryChartPanel(
     labelA: String,
     labelB: String,
     seriesBEnabled: Boolean,
+    resetKey: Any?,
     modifier: Modifier = Modifier,
 ) {
     val hasTrend = seriesA.size >= 2 || seriesB.size >= 2
@@ -306,25 +304,15 @@ private fun HistoryChartPanel(
                 }
             }
         } else {
-            val normalized = remember(seriesA, seriesB) { normalizeHistorySeries(seriesA, seriesB) }
-            Column(
-                modifier = Modifier.fillMaxSize().padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (normalized.minPrice != null && normalized.maxPrice != null) {
-                    Text(
-                        "${formatPrice(normalized.minPrice)} – ${formatPrice(normalized.maxPrice)}",
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-                PriceHistoryChart(normalized, modifier = Modifier.fillMaxWidth().weight(1f))
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("● $labelA", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                    if (seriesBEnabled) {
-                        Text("● $labelB", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
+            InteractivePriceHistoryChart(
+                seriesA = seriesA,
+                seriesB = seriesB,
+                labelA = labelA,
+                labelB = labelB,
+                showSeriesB = seriesBEnabled,
+                resetKey = resetKey,
+                modifier = Modifier.fillMaxSize().padding(8.dp),
+            )
         }
     }
 }
@@ -552,48 +540,6 @@ private fun HistoryDataDialog(
         },
         confirmButton = { Button(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Chiudi") } },
     )
-}
-
-@Composable
-private fun PriceHistoryChart(normalized: NormalizedHistorySeries, modifier: Modifier = Modifier) {
-    val colorA = MaterialTheme.colorScheme.primary
-    val colorB = MaterialTheme.colorScheme.tertiary
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
-
-    Canvas(modifier = modifier) {
-        val horizontalPadding = 12.dp.toPx()
-        val verticalPadding = 12.dp.toPx()
-        val plotWidth = (size.width - horizontalPadding * 2).coerceAtLeast(1f)
-        val plotHeight = (size.height - verticalPadding * 2).coerceAtLeast(1f)
-
-        repeat(3) { index ->
-            val y = verticalPadding + plotHeight * index / 2f
-            drawLine(
-                color = gridColor,
-                start = Offset(horizontalPadding, y),
-                end = Offset(size.width - horizontalPadding, y),
-                strokeWidth = 1.dp.toPx(),
-            )
-        }
-
-        fun drawSeries(points: List<NormalizedPricePoint>, color: Color) {
-            val canvasPoints = points.map { point ->
-                Offset(
-                    x = horizontalPadding + point.xFraction * plotWidth,
-                    y = verticalPadding + point.yFraction * plotHeight,
-                )
-            }
-            canvasPoints.zipWithNext().forEach { (start, end) ->
-                drawLine(color = color, start = start, end = end, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
-            }
-            canvasPoints.forEach { point ->
-                drawCircle(color = color, radius = 4.5.dp.toPx(), center = point)
-            }
-        }
-
-        drawSeries(normalized.seriesA, colorA)
-        drawSeries(normalized.seriesB, colorB)
-    }
 }
 
 private fun previousDeltaLabel(latest: PriceHistoryPoint?, previous: PriceHistoryPoint?): String {

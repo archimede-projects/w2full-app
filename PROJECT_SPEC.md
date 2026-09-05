@@ -1,244 +1,175 @@
 # W2Full — Project Specification
 
-> **Fonte di verità corrente.** Tutti i requisiti, decisioni, vincoli di firma, migrazioni e verifiche documentati nella cronologia Git fino al commit di integrazione RC2 `2055873dd0fa4fd0d075d1c6c0f8feb19c478c8c` restano normativi, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 resta l'unico checkpoint attivo.
+> **Fonte di verità corrente.** Restano normativi tutti i requisiti e le decisioni già verificati nella cronologia Git fino a `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 è l'unico checkpoint attivo.
 
-## Stato
+## Stato progetto
 
 - M0–M5: **chiuse**.
 - Distribuzione GitHub Releases: **chiusa**.
 - M6 — notifiche soglia: **non iniziata**.
-- M7.1: **chiusa e verificata su Galaxy S25**.
+- M7.1 — filtri Stazioni: **chiusa e verificata su Galaxy S25**.
 - M7.2 RC1/RC2: **FAIL UX**, sostituita da M7.4.
-- M7.4 RC1 `v0.5.3-m7.4-rc1`: tecnicamente verde ma **FAIL UX su Galaxy S25** il 5 settembre 2026.
-- M7.4 RC2: **checkpoint attivo; integrata su `main` e tecnicamente verde, da rilasciare e provare su Galaxy S25**.
+- M7.4 RC1 `v0.5.3-m7.4-rc1`: tecnicamente verde, **FAIL UX su Galaxy S25**.
+- M7.4 RC2 `v0.5.3-m7.4-rc2`: tecnicamente verde, **PASS UX parziale / FAIL funzionale** su posizione Stazioni e grafico incompleto.
+- M7.4 RC3: **in validazione**.
 
-## Evidenza RC1 M7.4
+## Baseline M7.4 RC2
 
-- sorgente esatta: `ae1904c2889ba4d5ec35d542c1889458feeeff20`;
-- Release run `33914981865`, job `101159953591`: **SUCCESS**;
-- APK `w2full-v0.5.3-m7.4-rc1-debug.apk`;
-- SHA-256 APK `9a0985f92aa1ff77a8325cb32d5c4bc400a0ab48fc6e5dbf66d220fbd38e7885`;
-- certificato persistente SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
-- public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
+La RC2 resta la baseline UX approvata per RC3:
+- Stazioni senza page-scroll; solo la lista risultati è scrollabile;
+- header e filtri compatti sempre raggiungibili;
+- un solo elenco, con ordinamento globale indipendente dai preferiti;
+- stella preferita direttamente sulla card con target touch 56×56 dp;
+- Storico principale non scrollabile, con `Cambia`, periodo, `Confronta`, `Mostra dati`;
+- Serie A/B indipendenti per carburante e Self/Servito;
+- Impostazioni ridotta a `Veicolo`, `Stazioni preferite`, `Informazioni`;
+- storico giornaliero Room schema 4 basato su `observedOn`, senza interpolazioni inventate.
 
-La prova reale ha confermato presenza delle funzioni ma ha respinto l'UX: schermate troppo scrollabili, filtri e impostazioni ridondanti, Storico troppo occupato dai controlli, grafico con un solo punto perché lo storico deduplica per `communicated_at`, e target della stella preferita troppo piccolo. RC1 non chiude M7.4.
+Release RC2 verificata:
+- sorgente `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`;
+- Android CI `33954009523`, job `101273898387`: **SUCCESS**;
+- Release run `33954142263`, job `101274257018`: **SUCCESS**;
+- tag `v0.5.3-m7.4-rc2` direttamente sullo SHA sorgente;
+- APK `w2full-v0.5.3-m7.4-rc2-debug.apk`, SHA-256 `bf5a57937978ca9517e61926774bb1a09d3192a77978df3991e578a031ace488`;
+- firma persistente verificata: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
 
-# M7.4 RC2 — contratto UX correttivo
+### Esito reale RC2 su Galaxy S25 — 5 settembre 2026
 
-Branch: `m7.4-ux-rc2`, derivato da `main` `ae1904c2889ba4d5ec35d542c1889458feeeff20`.
+Confermato dall'utente:
+- layout Stazioni compatto e lista come unica area scrollabile: migliorato e coerente col mockup;
+- stella grande: coerente;
+- Impostazioni ridotta: coerente;
+- Storico non scrollabile e confronto Benzina/Gasolio: presenti.
 
-## 1. Regola generale: niente page-scroll nelle tab principali
+Problemi che impediscono la chiusura M7.4:
+1. Stazioni può mostrare `Posizione non disponibile` e stazioni remote con `Distanza non disponibile` mentre Storico, nella stessa sessione, dispone di distanze corrette.
+2. Manca una posizione attuale leggibile nella UI Stazioni.
+3. Il grafico manca di scala prezzo asse Y e date asse X.
+4. Non è possibile selezionare un giorno e leggere i prezzi delle serie per quella data.
+5. Il grafico non supporta zoom/pan/reset.
 
-- `Stazioni`, `Storico` e home `Impostazioni` **non devono essere pagine verticalmente scrollabili**.
-- Header, stato sintetico, filtri/azioni principali e bottom navigation restano fissi e sempre raggiungibili.
-- In `Stazioni` **solo la lista risultati** può scorrere verticalmente.
-- Liste dedicate aperte da Impostazioni, come l'elenco completo preferite, possono avere una propria area-lista scrollabile; non devono trasformare la home Impostazioni in una lunga pagina.
-- La tabella completa dello Storico non allunga la schermata principale: si apre in una vista dedicata/lista dati.
-- Nessun controllo principale deve richiedere scroll per essere raggiunto su Galaxy S25.
+# M7.4 RC3 — contratto
 
-## 2. Target touch grandi
+Branch `m7.4-ux-rc3`, derivato dall'esatto `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`.
 
-- La stella preferita sulla card stazione è un controllo esplicito con area touch **minimo 48×48 dp**; icona visiva almeno 28 dp circa.
-- `☆` aggiunge e `★` rimuove con un singolo tap.
-- Anche refresh, filtri rapidi e azioni primarie rispettano target touch ampi; evitare chip minuscoli o controlli compressi.
+Commit spec-first: `e5d198fdda50092d12b4e271be488b064ea6205d`.
 
-## 3. Stazioni — layout compatto e user-centred
+## 1. Posizione Stazioni
 
-Area fissa superiore:
-1. titolo `W2Full` / `Stazioni Eni vicine`;
-2. riga compatta `Aggiornato …` con azione refresh grande;
-3. indicazione posizione solo se utile/errore, non in una card alta;
-4. una riga di controlli compatti che riassume almeno: raggio, ordinamento, scope `Tutte/Preferite`, carburante usato per il prezzo.
+- `Riprova` richiede una **nuova localizzazione reale** e ricalcola le distanze sulle stazioni già in cache, senza download MIMIT obbligatorio.
+- All'ingresso successivo nella tab Stazioni viene ritentata la localizzazione senza perdere il dataset in cache.
+- Con posizione disponibile, raggio e ordinamento distanza usano immediatamente le nuove distanze.
+- Con raggio 25 km attivo e posizione disponibile, risultati senza distanza o fuori raggio non devono restare visibili.
+- Un risultato location temporaneamente indisponibile proveniente dallo snapshot non deve sovrascrivere una posizione valida appena ottenuta nella stessa sessione.
+- La UI mostra una riga fissa `📍 <posizione attuale>`.
+- Preferenza label: `Comune (Provincia)` tramite reverse geocoding Android di sistema; fallback `📍 Posizione rilevata` se il nome non è risolvibile.
+- Mai coordinate grezze nella schermata principale.
+- Permission denied/unavailable mantiene azione `Consenti`/`Riprova` appropriata.
+- Il reverse geocoding non introduce account, cloud dell'app o servizi a pagamento e il suo fallimento non blocca raggio/distanze.
 
-I controlli dettagliati si aprono tramite dialog/bottom-sheet o contenitore temporaneo; non restano espansi occupando la schermata.
+## 2. Grafico Storico — assi
 
-Sotto l'area fissa parte una **LazyColumn risultati** che occupa tutto lo spazio restante.
+- Asse Y visibile a sinistra, unità `€/L`, con 3–5 tick leggibili.
+- Scala Y calcolata sui punti **attualmente visibili**, con margine sopra/sotto e range non nullo anche a prezzo costante.
+- Asse X visibile con date compatte italiane.
+- I giorni realmente mancanti restano mancanti: nessuna interpolazione artificiale.
+- Segmenti di linea non devono attraversare automaticamente buchi di più giorni.
 
-Regole lista invarianti:
-- un solo elenco operativo;
-- preferita/non preferita non altera l'ordinamento;
-- `Distanza`, `Prezzo Self`, `Prezzo Servito` ordinano globalmente tutte le stazioni del filtro corrente;
-- raggio applicato prima dell'ordinamento;
-- `Tutte/Preferite` filtra senza pinnare preferite sopra;
-- carburante di riferimento = carburante veicolo, chiaramente indicato;
-- stella grande direttamente nella card.
+## 3. Grafico Storico — selezione giorno
 
-## 4. Storico — informazione prima, configurazione dopo
+- Tap sul plot seleziona l'osservazione/giorno più vicino.
+- Quando non zoomato, trascinamento orizzontale permette di scorrere la selezione giorno per giorno.
+- La selezione mostra un cursore verticale.
+- Il dettaglio mostra data completa + valore Serie A + valore Serie B se attiva.
+- Se una serie non ha un'osservazione in quel giorno mostra `n.d.` e non inventa un valore.
 
-La schermata principale **non scrolla** e deve privilegiare il grafico.
+## 4. Grafico Storico — zoom e pan
 
-Layout principale:
-1. stazione selezionata + grande azione `Cambia`;
-2. sintesi compatta del prezzo corrente e, quando disponibile, confronto con osservazione precedente / min / max del periodo;
-3. grafico che usa la parte centrale disponibile;
-4. periodo rapido `7g`, `30g`, `3m`, `1a`, `Tutto`;
-5. azioni grandi `Confronta` e `Mostra dati`.
+- Pinch-to-zoom orizzontale sulle date.
+- Quando zoomato, drag orizzontale effettua il pan della finestra temporale.
+- Il pan resta nei limiti dei dati disponibili.
+- La scala Y si ricalcola sulla viewport corrente.
+- Doppio tap resetta zoom, pan e selezione.
+- Cambio periodo (`7g`, `30g`, `3m`, `1a`, `Tutto`) resetta la viewport.
+- Zoom massimo limitato; con meno di due giorni utili il grafico resta nello stato compatto `Storico in costruzione`.
 
-Scelta stazione:
-- `Cambia` apre selettore con gruppi/filtri `Preferite` e `Altre`;
-- liste ordinate per distanza quando posizione disponibile, altrimenti nome/ID stabile;
-- gestione stella resta in `Stazioni` e `Impostazioni > Stazioni preferite`.
+## 5. Layout invariato
+
+RC3 **non ridisegna** le schermate già approvate:
+- Stazioni resta fixed-screen con sola lista risultati scrollabile;
+- Storico principale resta non scrollabile;
+- Impostazioni resta con sole tre destinazioni globali;
+- target touch grandi invariati.
+
+## 6. Versione
+
+- `versionCode = 13`;
+- `versionName = 0.5.3-m7.4-rc3`.
+
+## 7. Test obbligatori
+
+Posizione:
+- retry effettua una nuova risoluzione;
+- cached stations vengono ricalcolate senza refresh dataset;
+- unavailable → available aggiorna stato, distanze, ranking e raggio;
+- label leggibile quando risolta e fallback `Posizione rilevata` quando non risolta;
+- regressioni permission denied/unavailable.
 
 Grafico:
-- Serie A sempre disponibile;
-- Serie B opzionale e configurabile tramite `Confronta`;
-- per ogni serie carburante e servizio indipendenti;
-- casi obbligatori: Benzina vs Gasolio, Benzina Self vs Benzina Servito, Benzina Servito vs Gasolio Servito;
-- legenda chiara;
-- 0/1 punto non mostra un grande grafico vuoto: stato `Storico in costruzione` con spazio proporzionato;
-- nessuna interpolazione inventata.
-
-`Mostra dati` apre una vista dedicata con lista/tabella delle osservazioni; non rende scrollabile la schermata Storico principale.
-
-## 5. Storico giornaliero reale
-
-Il modello M5 basato sulla chiave `stationId + fuel + isSelf + communicatedAt` viene corretto perché due estrazioni giornaliere possono riportare lo stesso prezzo e la stessa data comunicazione.
-
-Nuovo concetto: **osservazione giornaliera MIMIT**.
-
-Ogni refresh MIMIT riuscito registra per ogni prezzo valido Eni:
-- stationId;
-- fuelDescription;
-- isSelf;
-- prezzo;
-- `observedOn` = data di estrazione prezzi MIMIT quando disponibile; fallback alla data locale del refresh solo se il dataset non espone la data;
-- `communicatedAt` mantenuto come metadato;
-- importedAtEpochMillis.
-
-Unicità logica: `stationId + fuelDescription + isSelf + observedOn`.
-
-Conseguenze:
-- due refresh della **stessa estrazione** non duplicano punti;
-- l'estrazione del giorno successivo crea un nuovo punto anche se prezzo e `communicatedAt` non sono cambiati;
-- giorni non realmente osservati restano mancanti; nessun backfill/interpolazione inventata.
-
-Room passa da schema 3 a 4 con migrazione esplicita e senza destructive migration. I punti M5 già presenti vengono preservati come osservazioni legacy usando una data derivata dal timestamp import quando non esiste un `observedOn` originale.
-
-## 6. Impostazioni — eliminare ridondanza
-
-Home `Impostazioni` non scrollabile e ridotta a sole destinazioni globali:
-- `Veicolo`;
-- `Stazioni preferite`;
-- `Informazioni`.
-
-Rimuovere dalla home le sezioni duplicate `Stazioni` e `Storico`: raggio, ordinamento, periodo e confronto si impostano nella schermata dove vengono usati e l'app ricorda l'ultima scelta automaticamente.
-
-`Stazioni preferite` apre pagina dedicata/lista con target di rimozione grandi e tutte le preferite indipendentemente dal raggio.
-
-## 7. Persistenza e compatibilità
-
-- Preferiti e preferenze esistenti restano compatibili.
-- Le scelte operative Stazioni/Storico persistono localmente, ma non vengono duplicate come pagine impostazioni.
-- Nessun account/cloud/servizio a pagamento.
-- Firma debug persistente invariata.
-
-## 8. Versione RC2
-
-- `versionCode = 12`;
-- `versionName = 0.5.3-m7.4-rc2`.
-
-## 9. Test obbligatori RC2
-
-Stazioni:
-- header/controlli fuori dalla LazyColumn risultati;
-- solo lista risultati scrollabile;
-- ordinamento globale invariato con preferite miste;
-- filtro Tutte/Preferite;
-- star add/remove + persistenza;
-- target stella almeno 48 dp verificato per contratto UI;
-- regressioni raggio/prezzo/distanza.
-
-Storico:
-- schermata principale senza verticalScroll/LazyColumn;
-- selettore stazione separato;
-- Serie A/B configurabili;
-- periodi 7g/30g/3m/1a/tutto;
-- 0/1 punto gestito in modo compatto;
-- vista dati separata;
-- confronto Benzina/Gasolio e Self/Servito.
-
-Storico dati:
-- migrazione Room 3→4 preserva righe esistenti;
-- stessa extraction date non duplica;
-- extraction date successiva crea nuovo punto anche con prezzo/communicatedAt invariati;
-- query cronologica usa `observedOn`.
-
-Impostazioni:
-- home contiene solo Veicolo / Stazioni preferite / Informazioni;
-- nessuna duplicazione Stazioni/Storico;
-- home non scrollabile.
+- Y range/tick con prezzi uguali e differenti;
+- Y range usa soltanto dati della viewport;
+- X tick restano nella viewport;
+- selezione nearest-day;
+- Serie B mancante nello stesso giorno restituisce `n.d.`/null;
+- zoom clamp minimo/massimo;
+- pan clamp ai limiti;
+- reset viewport;
+- regressioni Serie A/B, periodi e storico giornaliero.
 
 Gate:
-- regressioni M3–M7 verdi;
-- CI branch reale test/build/firma/artifact SUCCESS;
-- PR limitato a M7.4 RC2;
-- CI `main` SUCCESS;
-- Release `v0.5.3-m7.4-rc2` dall'esatto SHA finale `main` con firma/hash/tag verificati;
-- M7.4 si chiude solo dopo PASS reale Galaxy S25.
+- Android CI reale branch: test/build/firma/artifact **SUCCESS**;
+- PR limitata a M7.4 RC3;
+- Android CI reale su `main`: **SUCCESS**;
+- Release reale `v0.5.3-m7.4-rc3` dall'esatto SHA finale `main` con tag, asset, firma e SHA-256 verificati;
+- M7.4 si chiude solo dopo nuovo PASS reale Galaxy S25.
 
-## 10. Implementazione candidata RC2 ed evidenze branch
+## 8. Implementazione RC3 candidata
 
-Contratto spec-first: commit `37f017b1b03ea534cd9a850ffef6c5bbee49a152`.
+Implementato sul branch:
+- resolver Android Geocoder per label località con fallback;
+- `FusedUserLocationProvider` usa nuova richiesta high-accuracy e fallback a last location;
+- `NearbyStationsViewModel` ricalcola le stazioni in cache da una fresh location e preserva una posizione valida da snapshot transitoriamente unavailable;
+- Stazioni mostra `📍 Comune (Provincia)` o `📍 Posizione rilevata`;
+- nuovo modello matematico puro per viewport, asse Y, tick X, selezione nearest-day, zoom e pan;
+- nuovo grafico Compose interattivo con cursore, dettaglio A/B, pinch zoom, pan e doppio-tap reset;
+- linee interrotte sui gap >1 giorno;
+- test dedicati per location retry/radius e grafico;
+- versione `0.5.3-m7.4-rc3`, versionCode 13.
 
-Implementazione funzionale:
-- Room schema 4 con `observed_on_epoch_day` e migrazione esplicita 3→4;
-- refresh MIMIT salva una osservazione per extraction date, anche a prezzo/communication date invariati;
-- Stazioni con area superiore fissa, riepilogo filtri compatto e sola LazyColumn risultati scrollabile;
-- stella card con target 56×56 dp;
-- Storico principale non scrollabile, grafico prioritario, `Cambia`, periodi rapidi, `Confronta`, `Mostra dati` in vista dedicata;
-- home Impostazioni ridotta a Veicolo / Stazioni preferite / Informazioni;
-- versione `0.5.3-m7.4-rc2`, versionCode 12.
+### Gate branch
 
-Primo run sull'implementazione `2e4888ce578cfdf25fc1e68dcfb6449b01ea7690`:
-- Android CI `33951586680`, job `101267287499`: **FAIL** in compilazione per tre import espliciti Compose `weight`; nessun merge eseguito.
-- Correzione limitata ai tre import, commit `1ced2738dd2ef0a3f8c335bf88dc6c41ed305d77`.
+Primo HEAD CI `843906e02f9fda400e91e947c84ccdfcc1492d9b`:
+- run `33959603212`, job `101289046922`: **FAIL** in `compileDebugKotlin`;
+- causa: due import espliciti `androidx.compose.foundation.layout.weight` risolvevano a un simbolo interno Compose;
+- build/APK non eseguiti; nessun merge;
+- correzione limitata alla rimozione degli import, mantenendo `weight` nei relativi `ColumnScope`/`RowScope`.
 
-Candidato branch validato:
-- HEAD `1ced2738dd2ef0a3f8c335bf88dc6c41ed305d77`;
-- Android CI run `33951747398`, job `101267726357`: **SUCCESS** completa;
+Candidato funzionale validato `5ac2f970494972d48af7c09e3517f3cc9c2ad983`:
+- Android CI run `33959732692`, job `101289390232`: **SUCCESS completa**;
 - JVM tests: **SUCCESS**;
 - `assembleDebug`: **SUCCESS**;
-- APK: **Verifies**, APK Signature Scheme v2, un signer;
+- APK: `Verifies`, APK Signature Scheme v2, un signer;
 - certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
 - public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- artifact `w2full-debug-apk`, ID `9965069664`, digest ZIP SHA-256 `6f2d2c7f7ffb116601e894f0a5df0053c3ae6d5bfe71c75e509f5810da1ffb69`, archivio `14523337` byte.
+- artifact `w2full-debug-apk`, ID `9967565312`;
+- artifact ZIP SHA-256 `fbfaa04038d97318ade88cc62d21e85d8c1b31634f3e3e0d51a23d7f57520453`, size `14549369` byte.
 
-HEAD documentale branch prima del PR:
-- `270a64fcddeb354cad682e4c5cc5266c248a15b2`;
-- Android CI `33951900505`, job `101268153141`: **SUCCESS** completa.
-
-## 11. Integrazione RC2 su main
-
-- PR #11 `fix(m7.4): fixed-screen UX and daily price history RC2`: mergeable e limitata a M7.4 RC2;
-- squash merge eseguito bloccando l'HEAD PR `270a64fcddeb354cad682e4c5cc5266c248a15b2`;
-- commit integrazione `main`: `2055873dd0fa4fd0d075d1c6c0f8feb19c478c8c`;
-- Android CI main run `33952047282`, job `101268553839`: **SUCCESS** completa;
-- JVM tests, `assembleDebug`, verifica APK/firma e upload artifact: **SUCCESS**;
-- artifact main `w2full-debug-apk`, ID `9965159882`, digest ZIP SHA-256 `5f8a8d05c49258cbc304afb14dfaccb00676feccac34adf6a8a7182b6f0fc373`, archivio `14523337` byte;
-- commit documentale `bfe139eca87fba2c33715ad2f17c93a3e24416ab`;
-- Android CI finale su `bfe139eca87fba2c33715ad2f17c93a3e24416ab`: run `33952641100`, job `101270161872`, **SUCCESS** completa;
-- artifact finale `w2full-debug-apk`, ID `9965344169`, digest ZIP SHA-256 `c965cdadb32646b289506897d7ed2c62cfb54e283b4cd91b48e09667f0d4fdaf`, archivio `14523337` byte;
-- firma finale verificata: schema v2, un signer, certificato e public key persistenti normativi.
-
-## 12. Cleanup CI e bridge one-shot Release RC2
-
-Prima della Release viene rimosso da `.github/workflows/android-ci.yml` **solo** il trigger temporaneo `m7.4-ux-rc2`; nessuna altra manutenzione delle Actions è autorizzata. Il commit risultante su `main` deve superare Android CI completa e diventa lo **SHA sorgente esatto** della Release RC2.
-
-Tag previsto: `v0.5.3-m7.4-rc2`.
-
-Il connettore GitHub disponibile non espone una mutazione diretta per creare tag Git. È quindi autorizzato **esclusivamente per questa RC2** un bridge one-shot su branch `m7.4-release-rc2`, senza modificare il workflow permanente di `main`:
-- il branch parte dall'esatto SHA finale `main` validato dopo il cleanup del trigger CI;
-- solo la copia branch di `.github/workflows/android-release.yml` aggiunge un trigger push su `m7.4-release-rc2` e imposta `RELEASE_TAG=v0.5.3-m7.4-rc2`;
-- checkout, test, build e firma usano l'esatto SHA finale `main`, **non** il commit temporaneo del bridge;
-- `softprops/action-gh-release` crea il tag `v0.5.3-m7.4-rc2` con `target_commitish` uguale allo stesso SHA finale `main` e pubblica l'APK reale;
-- certificato e public key devono coincidere con i digest persistenti normativi;
-- dopo Release verde, il branch `m7.4-release-rc2` viene riallineato allo SHA sorgente `main`, rimuovendo dal suo stato finale il trigger temporaneo;
-- `.github/workflows/android-release.yml` su `main` resta tag-only durante tutto il processo;
-- M7.4 resta aperta fino al PASS reale Galaxy S25.
+Il presente commit documentale deve superare una nuova CI completa prima dell'apertura PR.
 
 ## Fuori scope
 
 - M6 notifiche soglia;
 - issue #1 `Indicazioni`;
+- backfill storico MIMIT antecedente alle osservazioni locali;
 - manutenzione CI non necessaria;
 - nuove funzioni non approvate.

@@ -48,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archimede.w2full.W2FullApplication
 import com.archimede.w2full.data.mimit.MimitStationDistance
 import com.archimede.w2full.data.mimit.MimitStationFuelPrice
+import com.archimede.w2full.location.AndroidGeocoderLocationLabelResolver
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -69,6 +70,7 @@ fun NearbyStationsRoute() {
             repository = application.nearbyStationsRepository,
             preferencesStore = application.stationListPreferencesStore,
             favoriteStationsStore = application.historyFavoriteStationsStore,
+            locationLabelResolver = AndroidGeocoderLocationLabelResolver(application),
         )
     }
     val viewModel: NearbyStationsViewModel = viewModel(factory = factory)
@@ -136,6 +138,7 @@ private fun NearbyStationsScreen(
         CompactUpdateRow(state = state, onRefresh = onRefresh)
         CompactLocationRow(
             status = state.locationStatus,
+            locationLabel = state.locationLabel,
             onRequestLocationPermission = onRequestLocationPermission,
             onRetryLocation = onRetryLocation,
         )
@@ -246,30 +249,32 @@ private fun CompactUpdateRow(state: NearbyStationsUiState, onRefresh: () -> Unit
 @Composable
 private fun CompactLocationRow(
     status: NearbyLocationUiStatus?,
+    locationLabel: String?,
     onRequestLocationPermission: () -> Unit,
     onRetryLocation: () -> Unit,
 ) {
     when (status) {
         NearbyLocationUiStatus.AVAILABLE -> Text(
-            text = "● Posizione disponibile",
-            style = MaterialTheme.typography.bodySmall,
+            text = "📍 ${locationLabel ?: "Posizione rilevata"}",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
         )
         NearbyLocationUiStatus.PERMISSION_DENIED -> Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Posizione non autorizzata", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text("📍 Posizione non autorizzata", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onRequestLocationPermission, modifier = Modifier.heightIn(min = 48.dp)) { Text("Consenti") }
         }
         NearbyLocationUiStatus.UNAVAILABLE -> Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Posizione non disponibile", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text("📍 Posizione non disponibile", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onRetryLocation, modifier = Modifier.heightIn(min = 48.dp)) { Text("Riprova") }
         }
-        null -> Text("Posizione in aggiornamento…", style = MaterialTheme.typography.bodySmall)
+        null -> Text("📍 Posizione in aggiornamento…", style = MaterialTheme.typography.bodySmall)
     }
 }
 
