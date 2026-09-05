@@ -215,7 +215,26 @@ HEAD documentale branch prima del PR:
 - Android CI main run `33952047282`, job `101268553839`: **SUCCESS** completa;
 - JVM tests, `assembleDebug`, verifica APK/firma e upload artifact: **SUCCESS**;
 - artifact main `w2full-debug-apk`, ID `9965159882`, digest ZIP SHA-256 `5f8a8d05c49258cbc304afb14dfaccb00676feccac34adf6a8a7182b6f0fc373`, archivio `14523337` byte;
-- la Release RC2 deve essere taggata dal commit documentale finale di `main` successivo a questa evidenza e deve superare il workflow tag-only prima della prova Galaxy S25.
+- commit documentale `bfe139eca87fba2c33715ad2f17c93a3e24416ab`;
+- Android CI finale su `bfe139eca87fba2c33715ad2f17c93a3e24416ab`: run `33952641100`, job `101270161872`, **SUCCESS** completa;
+- artifact finale `w2full-debug-apk`, ID `9965344169`, digest ZIP SHA-256 `c965cdadb32646b289506897d7ed2c62cfb54e283b4cd91b48e09667f0d4fdaf`, archivio `14523337` byte;
+- firma finale verificata: schema v2, un signer, certificato e public key persistenti normativi.
+
+## 12. Cleanup CI e bridge one-shot Release RC2
+
+Prima della Release viene rimosso da `.github/workflows/android-ci.yml` **solo** il trigger temporaneo `m7.4-ux-rc2`; nessuna altra manutenzione delle Actions è autorizzata. Il commit risultante su `main` deve superare Android CI completa e diventa lo **SHA sorgente esatto** della Release RC2.
+
+Tag previsto: `v0.5.3-m7.4-rc2`.
+
+Il connettore GitHub disponibile non espone una mutazione diretta per creare tag Git. È quindi autorizzato **esclusivamente per questa RC2** un bridge one-shot su branch `m7.4-release-rc2`, senza modificare il workflow permanente di `main`:
+- il branch parte dall'esatto SHA finale `main` validato dopo il cleanup del trigger CI;
+- solo la copia branch di `.github/workflows/android-release.yml` aggiunge un trigger push su `m7.4-release-rc2` e imposta `RELEASE_TAG=v0.5.3-m7.4-rc2`;
+- checkout, test, build e firma usano l'esatto SHA finale `main`, **non** il commit temporaneo del bridge;
+- `softprops/action-gh-release` crea il tag `v0.5.3-m7.4-rc2` con `target_commitish` uguale allo stesso SHA finale `main` e pubblica l'APK reale;
+- certificato e public key devono coincidere con i digest persistenti normativi;
+- dopo Release verde, il branch `m7.4-release-rc2` viene riallineato allo SHA sorgente `main`, rimuovendo dal suo stato finale il trigger temporaneo;
+- `.github/workflows/android-release.yml` su `main` resta tag-only durante tutto il processo;
+- M7.4 resta aperta fino al PASS reale Galaxy S25.
 
 ## Fuori scope
 
