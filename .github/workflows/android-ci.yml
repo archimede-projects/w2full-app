@@ -19,7 +19,6 @@ on:
       - m7-station-filters
       - m7-history-favorites
       - m7.2-favorites-correction
-      - m6-price-alerts
   workflow_dispatch:
 
 permissions:
