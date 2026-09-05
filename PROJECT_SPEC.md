@@ -1,6 +1,6 @@
 # W2Full — Project Specification
 
-> **Fonte di verità corrente.** Restano normativi tutti i requisiti e le decisioni già verificati nella cronologia Git fino a `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 è l'unico checkpoint attivo.
+> **Fonte di verità corrente.** Restano normativi tutti i requisiti, le decisioni, i vincoli di firma e le verifiche presenti nella cronologia Git fino al sorgente Release RC3 `bcb02e9a1e1c1476a26873bf209356a4a721b677`, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 è l'unico checkpoint attivo e non è chiuso finché manca il PASS reale su Galaxy S25.
 
 ## Stato progetto
 
@@ -11,162 +11,147 @@
 - M7.2 RC1/RC2: **FAIL UX**, sostituita da M7.4.
 - M7.4 RC1 `v0.5.3-m7.4-rc1`: tecnicamente verde, **FAIL UX su Galaxy S25**.
 - M7.4 RC2 `v0.5.3-m7.4-rc2`: tecnicamente verde, **PASS UX parziale / FAIL funzionale** su posizione Stazioni e grafico incompleto.
-- M7.4 RC3: **in validazione**.
+- M7.4 RC3 `v0.5.3-m7.4-rc3`: **Release reale verificata; prova Galaxy S25 pendente**.
 
-## Baseline M7.4 RC2
+# M7.4 RC3 — contratto implementato
 
-La RC2 resta la baseline UX approvata per RC3:
-- Stazioni senza page-scroll; solo la lista risultati è scrollabile;
-- header e filtri compatti sempre raggiungibili;
-- un solo elenco, con ordinamento globale indipendente dai preferiti;
-- stella preferita direttamente sulla card con target touch 56×56 dp;
-- Storico principale non scrollabile, con `Cambia`, periodo, `Confronta`, `Mostra dati`;
-- Serie A/B indipendenti per carburante e Self/Servito;
-- Impostazioni ridotta a `Veicolo`, `Stazioni preferite`, `Informazioni`;
-- storico giornaliero Room schema 4 basato su `observedOn`, senza interpolazioni inventate.
+RC3 mantiene il layout fixed-screen approvato in RC2 e corregge esclusivamente posizione e grafico.
 
-Release RC2 verificata:
-- sorgente `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`;
-- Android CI `33954009523`, job `101273898387`: **SUCCESS**;
-- Release run `33954142263`, job `101274257018`: **SUCCESS**;
-- tag `v0.5.3-m7.4-rc2` direttamente sullo SHA sorgente;
-- APK `w2full-v0.5.3-m7.4-rc2-debug.apk`, SHA-256 `bf5a57937978ca9517e61926774bb1a09d3192a77978df3991e578a031ace488`;
-- firma persistente verificata: certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`, public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`.
+## Posizione Stazioni
 
-### Esito reale RC2 su Galaxy S25 — 5 settembre 2026
-
-Confermato dall'utente:
-- layout Stazioni compatto e lista come unica area scrollabile: migliorato e coerente col mockup;
-- stella grande: coerente;
-- Impostazioni ridotta: coerente;
-- Storico non scrollabile e confronto Benzina/Gasolio: presenti.
-
-Problemi che impediscono la chiusura M7.4:
-1. Stazioni può mostrare `Posizione non disponibile` e stazioni remote con `Distanza non disponibile` mentre Storico, nella stessa sessione, dispone di distanze corrette.
-2. Manca una posizione attuale leggibile nella UI Stazioni.
-3. Il grafico manca di scala prezzo asse Y e date asse X.
-4. Non è possibile selezionare un giorno e leggere i prezzi delle serie per quella data.
-5. Il grafico non supporta zoom/pan/reset.
-
-# M7.4 RC3 — contratto
-
-Branch `m7.4-ux-rc3`, derivato dall'esatto `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`.
-
-Commit spec-first: `e5d198fdda50092d12b4e271be488b064ea6205d`.
-
-## 1. Posizione Stazioni
-
-- `Riprova` richiede una **nuova localizzazione reale** e ricalcola le distanze sulle stazioni già in cache, senza download MIMIT obbligatorio.
-- All'ingresso successivo nella tab Stazioni viene ritentata la localizzazione senza perdere il dataset in cache.
-- Con posizione disponibile, raggio e ordinamento distanza usano immediatamente le nuove distanze.
-- Con raggio 25 km attivo e posizione disponibile, risultati senza distanza o fuori raggio non devono restare visibili.
-- Un risultato location temporaneamente indisponibile proveniente dallo snapshot non deve sovrascrivere una posizione valida appena ottenuta nella stessa sessione.
-- La UI mostra una riga fissa `📍 <posizione attuale>`.
-- Preferenza label: `Comune (Provincia)` tramite reverse geocoding Android di sistema; fallback `📍 Posizione rilevata` se il nome non è risolvibile.
-- Mai coordinate grezze nella schermata principale.
+- `Riprova` richiede una nuova localizzazione reale e ricalcola le distanze sulle stazioni già in cache senza obbligare un nuovo download MIMIT.
+- Una posizione valida appena ottenuta non viene sovrascritta da uno snapshot transitoriamente unavailable nella stessa sessione.
+- Raggio e ordinamento distanza usano immediatamente le distanze ricalcolate.
+- Con raggio attivo e posizione disponibile, risultati fuori raggio o senza distanza vengono esclusi.
+- La UI mostra `📍 Comune (Provincia)` tramite reverse geocoding Android di sistema; fallback `📍 Posizione rilevata` se il nome non è disponibile.
+- Nessuna coordinata grezza nella schermata principale.
 - Permission denied/unavailable mantiene azione `Consenti`/`Riprova` appropriata.
-- Il reverse geocoding non introduce account, cloud dell'app o servizi a pagamento e il suo fallimento non blocca raggio/distanze.
 
-## 2. Grafico Storico — assi
+## Grafico Storico
 
-- Asse Y visibile a sinistra, unità `€/L`, con 3–5 tick leggibili.
-- Scala Y calcolata sui punti **attualmente visibili**, con margine sopra/sotto e range non nullo anche a prezzo costante.
-- Asse X visibile con date compatte italiane.
-- I giorni realmente mancanti restano mancanti: nessuna interpolazione artificiale.
-- Segmenti di linea non devono attraversare automaticamente buchi di più giorni.
+- asse Y a sinistra in `€/L` con tick leggibili;
+- scala Y calcolata sui dati della viewport visibile con margine e range non nullo;
+- asse X con date compatte italiane;
+- nessuna interpolazione artificiale dei giorni mancanti e linee interrotte sui gap reali;
+- tap seleziona il giorno/osservazione più vicino;
+- trascinamento non zoomato permette lo scrub della selezione;
+- cursore verticale e dettaglio con data completa + Serie A/B;
+- serie assente nello stesso giorno = `n.d.`, senza valore inventato;
+- pinch-to-zoom orizzontale;
+- pan orizzontale quando zoomato, clampato ai limiti dati;
+- scala Y ricalcolata durante zoom/pan;
+- doppio tap resetta zoom, pan e selezione;
+- cambio periodo resetta viewport;
+- con meno di due giorni utili resta lo stato compatto `Storico in costruzione`.
 
-## 3. Grafico Storico — selezione giorno
+## Layout e compatibilità invariati
 
-- Tap sul plot seleziona l'osservazione/giorno più vicino.
-- Quando non zoomato, trascinamento orizzontale permette di scorrere la selezione giorno per giorno.
-- La selezione mostra un cursore verticale.
-- Il dettaglio mostra data completa + valore Serie A + valore Serie B se attiva.
-- Se una serie non ha un'osservazione in quel giorno mostra `n.d.` e non inventa un valore.
-
-## 4. Grafico Storico — zoom e pan
-
-- Pinch-to-zoom orizzontale sulle date.
-- Quando zoomato, drag orizzontale effettua il pan della finestra temporale.
-- Il pan resta nei limiti dei dati disponibili.
-- La scala Y si ricalcola sulla viewport corrente.
-- Doppio tap resetta zoom, pan e selezione.
-- Cambio periodo (`7g`, `30g`, `3m`, `1a`, `Tutto`) resetta la viewport.
-- Zoom massimo limitato; con meno di due giorni utili il grafico resta nello stato compatto `Storico in costruzione`.
-
-## 5. Layout invariato
-
-RC3 **non ridisegna** le schermate già approvate:
-- Stazioni resta fixed-screen con sola lista risultati scrollabile;
-- Storico principale resta non scrollabile;
-- Impostazioni resta con sole tre destinazioni globali;
+- Stazioni: niente page-scroll, solo lista risultati scrollabile.
+- Storico principale: non scrollabile.
+- Impostazioni: sole destinazioni `Veicolo`, `Stazioni preferite`, `Informazioni`.
 - target touch grandi invariati.
+- Room schema 4 e storico giornaliero `observedOn` invariati.
+- preferiti e preferenze locali invariati.
+- nessun account/cloud proprietario/servizio a pagamento.
+- firma debug persistente invariata.
 
-## 6. Versione
+## Versione
 
 - `versionCode = 13`;
 - `versionName = 0.5.3-m7.4-rc3`.
 
-## 7. Test obbligatori
+# Evidenze tecniche RC3
 
-Posizione:
-- retry effettua una nuova risoluzione;
-- cached stations vengono ricalcolate senza refresh dataset;
-- unavailable → available aggiorna stato, distanze, ranking e raggio;
-- label leggibile quando risolta e fallback `Posizione rilevata` quando non risolta;
-- regressioni permission denied/unavailable.
+## Spec-first e branch
 
-Grafico:
-- Y range/tick con prezzi uguali e differenti;
-- Y range usa soltanto dati della viewport;
-- X tick restano nella viewport;
-- selezione nearest-day;
-- Serie B mancante nello stesso giorno restituisce `n.d.`/null;
-- zoom clamp minimo/massimo;
-- pan clamp ai limiti;
-- reset viewport;
-- regressioni Serie A/B, periodi e storico giornaliero.
+- branch `m7.4-ux-rc3` derivato dall'esatto `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`;
+- commit spec-first `e5d198fdda50092d12b4e271be488b064ea6205d`.
 
-Gate:
-- Android CI reale branch: test/build/firma/artifact **SUCCESS**;
-- PR limitata a M7.4 RC3;
-- Android CI reale su `main`: **SUCCESS**;
-- Release reale `v0.5.3-m7.4-rc3` dall'esatto SHA finale `main` con tag, asset, firma e SHA-256 verificati;
-- M7.4 si chiude solo dopo nuovo PASS reale Galaxy S25.
+## Implementazione e gate branch
 
-## 8. Implementazione RC3 candidata
+Implementato:
+- fresh location request e ricalcolo cache in `NearbyStationsViewModel`;
+- `LocationLabelResolver` con Android Geocoder e fallback;
+- grafico interattivo Compose + modello matematico puro viewport/tick/selezione/zoom/pan;
+- test dedicati posizione e chart math.
 
-Implementato sul branch:
-- resolver Android Geocoder per label località con fallback;
-- `FusedUserLocationProvider` usa nuova richiesta high-accuracy e fallback a last location;
-- `NearbyStationsViewModel` ricalcola le stazioni in cache da una fresh location e preserva una posizione valida da snapshot transitoriamente unavailable;
-- Stazioni mostra `📍 Comune (Provincia)` o `📍 Posizione rilevata`;
-- nuovo modello matematico puro per viewport, asse Y, tick X, selezione nearest-day, zoom e pan;
-- nuovo grafico Compose interattivo con cursore, dettaglio A/B, pinch zoom, pan e doppio-tap reset;
-- linee interrotte sui gap >1 giorno;
-- test dedicati per location retry/radius e grafico;
-- versione `0.5.3-m7.4-rc3`, versionCode 13.
+Primo gate:
+- HEAD `843906e02f9fda400e91e947c84ccdfcc1492d9b`;
+- Android CI run `33959603212`, job `101289046922`: **FAIL** in `compileDebugKotlin` per due import espliciti Compose `weight` che risolvevano a simbolo interno;
+- nessun merge eseguito.
 
-### Gate branch
+Correzione limitata agli import.
 
-Primo HEAD CI `843906e02f9fda400e91e947c84ccdfcc1492d9b`:
-- run `33959603212`, job `101289046922`: **FAIL** in `compileDebugKotlin`;
-- causa: due import espliciti `androidx.compose.foundation.layout.weight` risolvevano a un simbolo interno Compose;
-- build/APK non eseguiti; nessun merge;
-- correzione limitata alla rimozione degli import, mantenendo `weight` nei relativi `ColumnScope`/`RowScope`.
-
-Candidato funzionale validato `5ac2f970494972d48af7c09e3517f3cc9c2ad983`:
+Candidato funzionale:
+- HEAD `5ac2f970494972d48af7c09e3517f3cc9c2ad983`;
 - Android CI run `33959732692`, job `101289390232`: **SUCCESS completa**;
+- JVM tests, `assembleDebug`, firma e artifact: **SUCCESS**;
+- artifact `w2full-debug-apk`, ID `9967565312`;
+- artifact ZIP SHA-256 `fbfaa04038d97318ade88cc62d21e85d8c1b31634f3e3e0d51a23d7f57520453`.
+
+HEAD documentale finale branch:
+- `463b47cfed1a8a37748ed168a5772bb3fe62f64a`;
+- Android CI run `33959910103`, job `101289874608`: **SUCCESS completa**.
+
+## Integrazione su main
+
+- PR #12 `fix(m7.4): current location and interactive history chart RC3`;
+- base `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`;
+- head validato `463b47cfed1a8a37748ed168a5772bb3fe62f64a`;
+- squash merge eseguito bloccando l'expected head SHA;
+- commit integrazione `main`: `40b9a0f2d6b169e2c05a6ab5f11c7ab7fb7883c9`;
+- Android CI post-merge run `33960093309`, job `101290364358`: **SUCCESS completa**.
+
+## Cleanup CI finale sorgente Release
+
+- rimosso esclusivamente il trigger temporaneo `m7.4-ux-rc3` da `.github/workflows/android-ci.yml`;
+- commit sorgente finale `main`: `bcb02e9a1e1c1476a26873bf209356a4a721b677`;
+- Android CI run `33961085355`, job `101292966146`: **SUCCESS completa**;
+- test JVM, build APK, verifica firma e upload artifact: **SUCCESS**.
+
+# Release reale RC3
+
+Tag: `v0.5.3-m7.4-rc3`.
+
+Poiché il connettore GitHub disponibile non espone una mutazione diretta di tag, è stato usato lo stesso bridge one-shot già adottato per le RC precedenti:
+- branch temporaneo operativo `m7.4-release-rc3` creato dall'esatto sorgente `bcb02e9a1e1c1476a26873bf209356a4a721b677`;
+- solo la copia branch di `android-release.yml` ha aggiunto il trigger branch e hardcodato tag + sorgente;
+- bridge commit `a9a7f650dbdcb1c161264680a6f65fe52d2cf429`;
+- checkout/build/test/firma effettuati sull'esatto sorgente `bcb02e9a1e1c1476a26873bf209356a4a721b677`, non sul bridge commit;
+- workflow permanente su `main` è rimasto tag-only;
+- dopo la Release il branch `m7.4-release-rc3` è stato forzatamente riallineato al sorgente `bcb02e9a1e1c1476a26873bf209356a4a721b677`, quindi il trigger temporaneo non resta nello stato finale del branch.
+
+Evidenza Release:
+- Android Release run `33961205244`, job `101293280752`: **SUCCESS completa**;
+- checkout confermato: `bcb02e9a1e1c1476a26873bf209356a4a721b677`;
 - JVM tests: **SUCCESS**;
 - `assembleDebug`: **SUCCESS**;
-- APK: `Verifies`, APK Signature Scheme v2, un signer;
+- APK `Verifies`;
+- APK Signature Scheme v2: `true`;
+- numero signer: `1`;
 - certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
 - public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
-- artifact `w2full-debug-apk`, ID `9967565312`;
-- artifact ZIP SHA-256 `fbfaa04038d97318ade88cc62d21e85d8c1b31634f3e3e0d51a23d7f57520453`, size `14549369` byte.
+- APK SHA-256 `53ff5d981ee752930f65edf197e460623c7c16e417914725404cadc08fa6f752`;
+- Release ID `383216022`, prerelease `true`, draft `false`;
+- asset ID `545706233`;
+- asset `w2full-v0.5.3-m7.4-rc3-debug.apk`;
+- asset size `15142766` byte;
+- digest asset GitHub `sha256:53ff5d981ee752930f65edf197e460623c7c16e417914725404cadc08fa6f752`;
+- tag lightweight `refs/tags/v0.5.3-m7.4-rc3` punta direttamente a `bcb02e9a1e1c1476a26873bf209356a4a721b677`.
 
-Il presente commit documentale deve superare una nuova CI completa prima dell'apertura PR.
+## Gate dispositivo ancora aperto
 
-## Fuori scope
+M7.4 **NON è chiusa**. Serve prova reale su Samsung Galaxy S25 della Release `v0.5.3-m7.4-rc3`.
+
+Verifica richiesta:
+1. aggiornamento/installazione sopra RC2 senza perdita dati;
+2. Stazioni: posizione leggibile e coerente, `Riprova` effettivo, distanze/raggio corretti;
+3. Storico: assi X/Y leggibili;
+4. tap/scrub giorno con valori A/B corretti e `n.d.` dove manca una serie;
+5. pinch zoom, pan e doppio-tap reset;
+6. nessuna regressione su layout fixed-screen, preferiti, Impostazioni e storico giornaliero.
+
+# Fuori scope
 
 - M6 notifiche soglia;
 - issue #1 `Indicazioni`;
