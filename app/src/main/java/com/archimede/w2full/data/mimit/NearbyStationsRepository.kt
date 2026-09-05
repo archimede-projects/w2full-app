@@ -41,11 +41,8 @@ sealed interface MimitRefreshResult {
 
 interface NearbyStationsRepository {
     fun observeStations(): Flow<NearbyStationsSnapshot?>
-
     suspend fun loadCachedSnapshot(): NearbyStationsSnapshot?
-
     suspend fun resolveLocation(): UserLocationResult
-
     suspend fun refresh(): MimitRefreshResult
 }
 
@@ -60,6 +57,7 @@ class RoomNearbyStationsRepository(
     private val logger: MimitLogger,
     private val clock: Clock = Clock.systemUTC(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val onRefreshSuccess: suspend () -> Unit = {},
 ) : NearbyStationsRepository {
     override fun observeStations(): Flow<NearbyStationsSnapshot?> =
         combine(
@@ -134,6 +132,16 @@ class RoomNearbyStationsRepository(
                 cacheDao.upsertSyncState(syncState)
             }
 
+            try {
+                onRefreshSuccess()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (exception: Exception) {
+                logger.error(
+                    "Post-refresh price alert evaluation failed: ${exception::class.java.simpleName}: ${exception.message.orEmpty()}",
+                    exception,
+                )
+            }
             MimitRefreshResult.Success(successfulAt)
         } catch (cancellation: CancellationException) {
             throw cancellation
@@ -174,18 +182,10 @@ class RoomNearbyStationsRepository(
         eniStations: List<MimitStation>,
         eniPrices: List<MimitPrice>,
     ) {
-        if (stationRows.isEmpty()) {
-            throw MimitCacheValidationException("Station dataset is empty")
-        }
-        if (priceRows.isEmpty()) {
-            throw MimitCacheValidationException("Price dataset is empty")
-        }
-        if (eniStations.isEmpty()) {
-            throw MimitCacheValidationException("No Eni stations found in station dataset")
-        }
-        if (eniPrices.isEmpty()) {
-            throw MimitCacheValidationException("No prices found for cached Eni stations")
-        }
+        if (stationRows.isEmpty()) throw MimitCacheValidationException("Station dataset is empty")
+        if (priceRows.isEmpty()) throw MimitCacheValidationException("Price dataset is empty")
+        if (eniStations.isEmpty()) throw MimitCacheValidationException("No Eni stations found in station dataset")
+        if (eniPrices.isEmpty()) throw MimitCacheValidationException("No prices found for cached Eni stations")
         if (eniStations.map { it.id }.toSet().size != eniStations.size) {
             throw MimitCacheValidationException("Duplicate Eni station IDs in station dataset")
         }

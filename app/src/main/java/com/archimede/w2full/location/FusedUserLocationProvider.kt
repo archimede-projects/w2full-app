@@ -18,6 +18,7 @@ class FusedUserLocationProvider(
     context: Context,
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context.applicationContext),
+    private val onLocationAvailable: (GeoPoint) -> Unit = {},
 ) : UserLocationProvider {
     private val applicationContext = context.applicationContext
 
@@ -32,7 +33,12 @@ class FusedUserLocationProvider(
                 UserLocationResult.Unavailable
             } else {
                 val point = runCatching { GeoPoint(location.latitude, location.longitude) }.getOrNull()
-                if (point == null) UserLocationResult.Unavailable else UserLocationResult.Available(point)
+                if (point == null) {
+                    UserLocationResult.Unavailable
+                } else {
+                    runCatching { onLocationAvailable(point) }
+                    UserLocationResult.Available(point)
+                }
             }
         } catch (_: SecurityException) {
             UserLocationResult.PermissionDenied

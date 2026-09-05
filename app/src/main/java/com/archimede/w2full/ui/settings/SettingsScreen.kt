@@ -37,6 +37,7 @@ private enum class SettingsPage {
     HOME,
     VEHICLE,
     FAVORITES,
+    PRICE_ALERT,
     INFO,
 }
 
@@ -67,6 +68,7 @@ fun SettingsRoute() {
             onBack = { page = SettingsPage.HOME },
             onRemove = viewModel::removeFavorite,
         )
+        SettingsPage.PRICE_ALERT -> PriceAlertSettingsRoute(onBack = { page = SettingsPage.HOME })
         SettingsPage.INFO -> InfoSettingsScreen(onBack = { page = SettingsPage.HOME })
     }
 }
@@ -75,12 +77,12 @@ fun SettingsRoute() {
 private fun SettingsHome(onOpen: (SettingsPage) -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("⚙ Impostazioni", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                "Solo le impostazioni globali. I filtri restano dove li usi.",
+                "Preferenze globali dell'app.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -88,19 +90,25 @@ private fun SettingsHome(onOpen: (SettingsPage) -> Unit) {
         SettingsCard(
             icon = "🚗",
             title = "Veicolo",
-            subtitle = "Carburante predefinito e dati della tua auto",
+            subtitle = "Carburante e dati dell'auto",
             modifier = Modifier.weight(1f),
         ) { onOpen(SettingsPage.VEHICLE) }
         SettingsCard(
             icon = "★",
             title = "Stazioni preferite",
-            subtitle = "Gestisci le stazioni che vuoi seguire",
+            subtitle = "Gestisci le stazioni seguite",
             modifier = Modifier.weight(1f),
         ) { onOpen(SettingsPage.FAVORITES) }
         SettingsCard(
+            icon = "🔔",
+            title = "Avviso prezzo",
+            subtitle = "Soglia Eni e notifica locale",
+            modifier = Modifier.weight(1f),
+        ) { onOpen(SettingsPage.PRICE_ALERT) }
+        SettingsCard(
             icon = "ⓘ",
             title = "Informazioni",
-            subtitle = "Versione, dati MIMIT e privacy locale",
+            subtitle = "Versione, MIMIT e privacy",
             modifier = Modifier.weight(1f),
         ) { onOpen(SettingsPage.INFO) }
     }
@@ -116,14 +124,14 @@ private fun SettingsCard(
 ) {
     Card(onClick = onClick, modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(icon, style = MaterialTheme.typography.headlineMedium)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("›", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
         }
