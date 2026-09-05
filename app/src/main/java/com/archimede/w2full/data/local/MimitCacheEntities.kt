@@ -53,11 +53,11 @@ data class MimitPriceEntity(
 
 @Entity(
     tableName = "mimit_price_history",
-    primaryKeys = ["station_id", "fuel_description", "is_self", "communicated_at"],
+    primaryKeys = ["station_id", "fuel_description", "is_self", "observed_on_epoch_day"],
     indices = [
         Index(
             name = "idx_mimit_price_history_station_fuel_service",
-            value = ["station_id", "fuel_description", "is_self", "communicated_at"],
+            value = ["station_id", "fuel_description", "is_self", "observed_on_epoch_day"],
         ),
     ],
 )
@@ -70,6 +70,8 @@ data class MimitPriceHistoryEntity(
     val priceMilliEuroPerUnit: Long,
     @ColumnInfo(name = "is_self")
     val isSelf: Boolean,
+    @ColumnInfo(name = "observed_on_epoch_day")
+    val observedOnEpochDay: Long,
     @ColumnInfo(name = "communicated_at")
     val communicatedAt: String,
     @ColumnInfo(name = "imported_at_epoch_millis")

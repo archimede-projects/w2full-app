@@ -2,6 +2,7 @@ package com.archimede.w2full.ui.history
 
 import android.content.Context
 import com.archimede.w2full.data.repository.PriceHistoryPoint
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 enum class HistoryStationScope {
@@ -9,12 +10,14 @@ enum class HistoryStationScope {
     OTHERS,
 }
 
-enum class HistoryPeriod(val months: Long?) {
-    ONE_MONTH(1),
-    THREE_MONTHS(3),
-    SIX_MONTHS(6),
-    ONE_YEAR(12),
-    ALL(null),
+enum class HistoryPeriod {
+    SEVEN_DAYS,
+    THIRTY_DAYS,
+    ONE_MONTH,
+    THREE_MONTHS,
+    SIX_MONTHS,
+    ONE_YEAR,
+    ALL,
 }
 
 data class HistoryPreferences(
@@ -24,7 +27,7 @@ data class HistoryPreferences(
     val seriesBEnabled: Boolean = false,
     val seriesBFuelType: String? = null,
     val seriesBIsSelf: Boolean = true,
-    val period: HistoryPeriod = HistoryPeriod.ALL,
+    val period: HistoryPeriod = HistoryPeriod.THIRTY_DAYS,
     val showTable: Boolean = false,
 )
 
@@ -46,7 +49,7 @@ class SharedPreferencesHistoryPreferencesStore(context: Context) : HistoryPrefer
         seriesBEnabled = preferences.getBoolean(KEY_SERIES_B_ENABLED, false),
         seriesBFuelType = preferences.getString(KEY_SERIES_B_FUEL, null),
         seriesBIsSelf = preferences.getBoolean(KEY_SERIES_B_SELF, true),
-        period = enumValueOrDefault(preferences.getString(KEY_PERIOD, null), HistoryPeriod.ALL),
+        period = enumValueOrDefault(preferences.getString(KEY_PERIOD, null), HistoryPeriod.THIRTY_DAYS),
         showTable = preferences.getBoolean(KEY_SHOW_TABLE, false),
     )
 
@@ -94,31 +97,44 @@ internal fun filterHistoryPointsByPeriod(
     period: HistoryPeriod,
     now: LocalDateTime = LocalDateTime.now(),
 ): List<PriceHistoryPoint> {
-    val months = period.months ?: return points
-    val threshold = now.minusMonths(months)
-    return points.filter { !it.communicatedAt.isBefore(threshold) }
+    if (period == HistoryPeriod.ALL) return points
+    val today = now.toLocalDate()
+    val threshold: LocalDate = when (period) {
+        HistoryPeriod.SEVEN_DAYS -> today.minusDays(6)
+        HistoryPeriod.THIRTY_DAYS -> today.minusDays(29)
+        HistoryPeriod.ONE_MONTH -> today.minusMonths(1)
+        HistoryPeriod.THREE_MONTHS -> today.minusMonths(3)
+        HistoryPeriod.SIX_MONTHS -> today.minusMonths(6)
+        HistoryPeriod.ONE_YEAR -> today.minusYears(1)
+        HistoryPeriod.ALL -> return points
+    }
+    return points.filter { !it.observedOn.isBefore(threshold) }
 }
 
 data class HistoryTableRow(
     val communicatedAt: LocalDateTime,
     val seriesAPriceMilliEuroPerUnit: Long?,
     val seriesBPriceMilliEuroPerUnit: Long?,
+    val observedOn: LocalDate = communicatedAt.toLocalDate(),
 )
 
 internal fun mergeHistorySeriesRows(
     seriesA: List<PriceHistoryPoint>,
     seriesB: List<PriceHistoryPoint>,
 ): List<HistoryTableRow> {
-    val aByDate = seriesA.associateBy { it.communicatedAt }
-    val bByDate = seriesB.associateBy { it.communicatedAt }
+    val aByDate = seriesA.associateBy { it.observedOn }
+    val bByDate = seriesB.associateBy { it.observedOn }
     return (aByDate.keys + bByDate.keys)
         .distinct()
         .sorted()
         .map { date ->
+            val a = aByDate[date]
+            val b = bByDate[date]
             HistoryTableRow(
-                communicatedAt = date,
-                seriesAPriceMilliEuroPerUnit = aByDate[date]?.priceMilliEuroPerUnit,
-                seriesBPriceMilliEuroPerUnit = bByDate[date]?.priceMilliEuroPerUnit,
+                communicatedAt = a?.communicatedAt ?: requireNotNull(b).communicatedAt,
+                seriesAPriceMilliEuroPerUnit = a?.priceMilliEuroPerUnit,
+                seriesBPriceMilliEuroPerUnit = b?.priceMilliEuroPerUnit,
+                observedOn = date,
             )
         }
 }

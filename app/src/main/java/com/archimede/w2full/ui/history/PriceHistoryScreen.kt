@@ -1,27 +1,33 @@
 package com.archimede.w2full.ui.history
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -39,8 +45,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val HistoryDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ITALY)
+private val HistoryDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ITALY)
 
 @Composable
 fun PriceHistoryRoute() {
@@ -68,7 +73,6 @@ fun PriceHistoryRoute() {
         onSeriesBFuelSelected = viewModel::selectSeriesBFuelType,
         onSeriesBServiceSelected = viewModel::selectSeriesBServiceMode,
         onPeriodChanged = viewModel::setPeriod,
-        onShowTableChanged = viewModel::setShowTable,
     )
 }
 
@@ -83,233 +87,381 @@ private fun PriceHistoryScreen(
     onSeriesBFuelSelected: (String) -> Unit,
     onSeriesBServiceSelected: (Boolean) -> Unit,
     onPeriodChanged: (HistoryPeriod) -> Unit,
-    onShowTableChanged: (Boolean) -> Unit,
 ) {
+    var stationPickerOpen by remember { mutableStateOf(false) }
+    var compareOpen by remember { mutableStateOf(false) }
+    var dataOpen by remember { mutableStateOf(false) }
+
     val selectedStation = state.stations.firstOrNull { it.stationId == state.selectedStationId }
-    val now = remember { LocalDateTime.now() }
-    val seriesA = remember(state.seriesAPoints, state.period, now) {
+    val now = LocalDateTime.now()
+    val seriesA = remember(state.seriesAPoints, state.period, now.toLocalDate()) {
         filterHistoryPointsByPeriod(state.seriesAPoints, state.period, now)
     }
-    val seriesB = remember(state.seriesBPoints, state.period, state.seriesBEnabled, now) {
+    val seriesB = remember(state.seriesBPoints, state.period, state.seriesBEnabled, now.toLocalDate()) {
         if (state.seriesBEnabled) filterHistoryPointsByPeriod(state.seriesBPoints, state.period, now) else emptyList()
     }
     val labelA = seriesLabel(state.seriesAFuelType, state.seriesAIsSelf)
     val labelB = seriesLabel(state.seriesBFuelType, state.seriesBIsSelf)
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            Column(
-                modifier = Modifier.padding(top = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = "Storico prezzi",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Confronta gli andamenti MIMIT della stazione che scegli.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        Text("Storico prezzi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-        item {
-            HistoryFilterSection(title = "Stazioni") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = state.stationScope == HistoryStationScope.FAVORITES,
-                        onClick = { onStationScopeChanged(HistoryStationScope.FAVORITES) },
-                        label = { Text("★ Preferite") },
-                    )
-                    FilterChip(
-                        selected = state.stationScope == HistoryStationScope.OTHERS,
-                        onClick = { onStationScopeChanged(HistoryStationScope.OTHERS) },
-                        label = { Text("Altre") },
-                    )
-                }
-            }
-        }
-
-        if (state.stations.isEmpty()) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+        if (selectedStation == null) {
+            Card(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(18.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
-                        text = if (state.stationScope == HistoryStationScope.FAVORITES) {
-                            "Nessuna stazione preferita con storico. Aggiungila dalla schermata Stazioni."
+                        if (state.stationScope == HistoryStationScope.FAVORITES) {
+                            "Nessuna preferita con storico"
                         } else {
-                            "Nessun'altra stazione con storico disponibile."
+                            "Nessuna stazione con storico"
                         },
-                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                }
-            }
-        } else {
-            item {
-                HistoryStationSelector(
-                    stations = state.stations,
-                    selectedStationId = state.selectedStationId,
-                    distanceByStationId = state.distanceByStationId,
-                    onStationSelected = onStationSelected,
-                )
-            }
-
-            selectedStation?.let { station ->
-                item {
                     Text(
-                        text = listOf(station.address, station.municipality, station.province)
-                            .filter { it.isNotBlank() }
-                            .joinToString(" · "),
+                        "Puoi cambiare gruppo e scegliere una stazione.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Button(
+                        onClick = { stationPickerOpen = true },
+                        modifier = Modifier.padding(top = 12.dp).heightIn(min = 52.dp),
+                    ) { Text("Cambia stazione") }
                 }
             }
+        } else {
+            StationSummary(
+                station = selectedStation,
+                distanceKm = state.distanceByStationId[selectedStation.stationId],
+                isFavorite = selectedStation.stationId in state.favoriteStationIds,
+                onChange = { stationPickerOpen = true },
+            )
 
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(
-                            text = "Configura grafico",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        SeriesConfigurator(
-                            title = "Serie A",
-                            fuelTypes = state.fuelTypes,
-                            selectedFuelType = state.seriesAFuelType,
-                            serviceModes = state.seriesAServiceModes,
-                            selectedIsSelf = state.seriesAIsSelf,
-                            onFuelSelected = onSeriesAFuelSelected,
-                            onServiceSelected = onSeriesAServiceSelected,
-                        )
+            PriceSummary(seriesA = seriesA, labelA = labelA)
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("Mostra Serie B", style = MaterialTheme.typography.labelLarge)
-                            Switch(
-                                checked = state.seriesBEnabled,
-                                onCheckedChange = onSeriesBEnabledChanged,
-                            )
-                        }
+            HistoryChartPanel(
+                seriesA = seriesA,
+                seriesB = seriesB,
+                labelA = labelA,
+                labelB = labelB,
+                seriesBEnabled = state.seriesBEnabled,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
 
-                        if (state.seriesBEnabled) {
-                            SeriesConfigurator(
-                                title = "Serie B",
-                                fuelTypes = state.fuelTypes,
-                                selectedFuelType = state.seriesBFuelType,
-                                serviceModes = state.seriesBServiceModes,
-                                selectedIsSelf = state.seriesBIsSelf,
-                                onFuelSelected = onSeriesBFuelSelected,
-                                onServiceSelected = onSeriesBServiceSelected,
-                            )
-                        }
-                    }
+            PeriodRow(selected = state.period, onPeriodChanged = onPeriodChanged)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = { compareOpen = true },
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                ) {
+                    Text(if (state.seriesBEnabled) "Confronto ✓" else "Confronta")
                 }
-            }
-
-            item {
-                HistoryFilterSection(title = "Periodo") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        PeriodChip("1 mese", HistoryPeriod.ONE_MONTH, state.period, onPeriodChanged)
-                        PeriodChip("3 mesi", HistoryPeriod.THREE_MONTHS, state.period, onPeriodChanged)
-                        PeriodChip("6 mesi", HistoryPeriod.SIX_MONTHS, state.period, onPeriodChanged)
-                        PeriodChip("1 anno", HistoryPeriod.ONE_YEAR, state.period, onPeriodChanged)
-                        PeriodChip("Tutto", HistoryPeriod.ALL, state.period, onPeriodChanged)
-                    }
-                }
-            }
-
-            if (seriesA.isEmpty() && seriesB.isEmpty()) {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Nessun punto disponibile per le serie e il periodo selezionati.",
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                }
-            } else {
-                item {
-                    PriceHistoryChartCard(
-                        seriesA = seriesA,
-                        seriesB = seriesB,
-                        labelA = labelA,
-                        labelB = labelB,
-                        seriesBEnabled = state.seriesBEnabled,
-                    )
-                }
-
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Tabella dati",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Switch(checked = state.showTable, onCheckedChange = onShowTableChanged)
-                    }
-                }
-
-                if (state.showTable) {
-                    val rows = mergeHistorySeriesRows(seriesA, seriesB)
-                    item {
-                        HistoryTableHeader(labelA, if (state.seriesBEnabled) labelB else null)
-                    }
-                    items(rows.asReversed(), key = { it.communicatedAt.toString() }) { row ->
-                        HistoryTableDataRow(
-                            row = row,
-                            showSeriesB = state.seriesBEnabled,
-                        )
-                    }
+                OutlinedButton(
+                    onClick = { dataOpen = true },
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                ) {
+                    Text("Mostra dati")
                 }
             }
         }
+    }
 
-        item { Column(modifier = Modifier.height(4.dp)) {} }
+    if (stationPickerOpen) {
+        StationPickerDialog(
+            state = state,
+            onScopeChanged = onStationScopeChanged,
+            onStationSelected = {
+                onStationSelected(it)
+                stationPickerOpen = false
+            },
+            onDismiss = { stationPickerOpen = false },
+        )
+    }
+
+    if (compareOpen) {
+        CompareDialog(
+            state = state,
+            onSeriesAFuelSelected = onSeriesAFuelSelected,
+            onSeriesAServiceSelected = onSeriesAServiceSelected,
+            onSeriesBEnabledChanged = onSeriesBEnabledChanged,
+            onSeriesBFuelSelected = onSeriesBFuelSelected,
+            onSeriesBServiceSelected = onSeriesBServiceSelected,
+            onDismiss = { compareOpen = false },
+        )
+    }
+
+    if (dataOpen) {
+        HistoryDataDialog(
+            seriesA = seriesA,
+            seriesB = seriesB,
+            labelA = labelA,
+            labelB = labelB,
+            showSeriesB = state.seriesBEnabled,
+            onDismiss = { dataOpen = false },
+        )
     }
 }
 
 @Composable
-private fun HistoryStationSelector(
-    stations: List<PriceHistoryStation>,
-    selectedStationId: Long?,
-    distanceByStationId: Map<Long, Double?>,
-    onStationSelected: (Long) -> Unit,
+private fun StationSummary(
+    station: PriceHistoryStation,
+    distanceKm: Double?,
+    isFavorite: Boolean,
+    onChange: () -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(stations, key = { it.stationId }) { station ->
-            val base = station.name.ifBlank { "Eni #${station.stationId}" }
-            val distance = distanceByStationId[station.stationId]
-            val label = if (distance != null) "$base (${String.format(Locale.ITALY, "%.1f", distance)} km)" else base
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    (if (isFavorite) "★ " else "") + station.name.ifBlank { "Eni #${station.stationId}" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                val subtitle = buildList {
+                    if (station.municipality.isNotBlank()) add(station.municipality)
+                    distanceKm?.let { add(String.format(Locale.ITALY, "%.1f km", it)) }
+                }.joinToString(" · ")
+                if (subtitle.isNotBlank()) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Button(onClick = onChange, modifier = Modifier.heightIn(min = 52.dp)) { Text("Cambia") }
+        }
+    }
+}
+
+@Composable
+private fun PriceSummary(seriesA: List<PriceHistoryPoint>, labelA: String) {
+    val latest = seriesA.lastOrNull()
+    val previous = seriesA.getOrNull(seriesA.lastIndex - 1)
+    val min = seriesA.minOfOrNull { it.priceMilliEuroPerUnit }
+    val max = seriesA.maxOfOrNull { it.priceMilliEuroPerUnit }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(labelA, style = MaterialTheme.typography.labelLarge)
+            Text(
+                latest?.let { formatPrice(it.priceMilliEuroPerUnit) } ?: "—",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(previousDeltaLabel(latest, previous), style = MaterialTheme.typography.bodySmall)
+            if (min != null && max != null) {
+                Text("min ${formatPrice(min)} · max ${formatPrice(max)}", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryChartPanel(
+    seriesA: List<PriceHistoryPoint>,
+    seriesB: List<PriceHistoryPoint>,
+    labelA: String,
+    labelB: String,
+    seriesBEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val hasTrend = seriesA.size >= 2 || seriesB.size >= 2
+    Card(modifier = modifier) {
+        if (!hasTrend) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(18.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Storico in costruzione", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Servono almeno due osservazioni giornaliere per disegnare un andamento.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (seriesA.isNotEmpty() || seriesB.isNotEmpty()) {
+                    Text(
+                        "${seriesA.size} punto/i $labelA" + if (seriesBEnabled) " · ${seriesB.size} punto/i $labelB" else "",
+                        modifier = Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        } else {
+            val normalized = remember(seriesA, seriesB) { normalizeHistorySeries(seriesA, seriesB) }
+            Column(
+                modifier = Modifier.fillMaxSize().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (normalized.minPrice != null && normalized.maxPrice != null) {
+                    Text(
+                        "${formatPrice(normalized.minPrice)} – ${formatPrice(normalized.maxPrice)}",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                PriceHistoryChart(normalized, modifier = Modifier.fillMaxWidth().weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("● $labelA", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                    if (seriesBEnabled) {
+                        Text("● $labelB", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodRow(selected: HistoryPeriod, onPeriodChanged: (HistoryPeriod) -> Unit) {
+    val periods = listOf(
+        "7g" to HistoryPeriod.SEVEN_DAYS,
+        "30g" to HistoryPeriod.THIRTY_DAYS,
+        "3m" to HistoryPeriod.THREE_MONTHS,
+        "1a" to HistoryPeriod.ONE_YEAR,
+        "Tutto" to HistoryPeriod.ALL,
+    )
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        periods.forEach { (label, period) ->
             FilterChip(
-                selected = station.stationId == selectedStationId,
-                onClick = { onStationSelected(station.stationId) },
-                label = { Text(label) },
+                selected = selected == period || (label == "30g" && selected == HistoryPeriod.ONE_MONTH),
+                onClick = { onPeriodChanged(period) },
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
             )
         }
     }
 }
 
 @Composable
-private fun SeriesConfigurator(
+private fun StationPickerDialog(
+    state: PriceHistoryUiState,
+    onScopeChanged: (HistoryStationScope) -> Unit,
+    onStationSelected: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cambia stazione") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = state.stationScope == HistoryStationScope.FAVORITES,
+                        onClick = { onScopeChanged(HistoryStationScope.FAVORITES) },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        label = { Text("★ Preferite") },
+                    )
+                    FilterChip(
+                        selected = state.stationScope == HistoryStationScope.OTHERS,
+                        onClick = { onScopeChanged(HistoryStationScope.OTHERS) },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        label = { Text("Altre") },
+                    )
+                }
+                if (state.stations.isEmpty()) {
+                    Text(
+                        if (state.stationScope == HistoryStationScope.FAVORITES) {
+                            "Nessuna preferita con storico."
+                        } else {
+                            "Nessun'altra stazione con storico."
+                        },
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        items(state.stations, key = { it.stationId }) { station ->
+                            val distance = state.distanceByStationId[station.stationId]
+                            OutlinedButton(
+                                onClick = { onStationSelected(station.stationId) },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Text(station.name.ifBlank { "Eni #${station.stationId}" }, maxLines = 1)
+                                    distance?.let {
+                                        Text(String.format(Locale.ITALY, "%.1f km", it), style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Chiudi") } },
+    )
+}
+
+@Composable
+private fun CompareDialog(
+    state: PriceHistoryUiState,
+    onSeriesAFuelSelected: (String) -> Unit,
+    onSeriesAServiceSelected: (Boolean) -> Unit,
+    onSeriesBEnabledChanged: (Boolean) -> Unit,
+    onSeriesBFuelSelected: (String) -> Unit,
+    onSeriesBServiceSelected: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Configura confronto") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                CompactSeriesEditor(
+                    title = "Serie A",
+                    fuelTypes = state.fuelTypes,
+                    selectedFuelType = state.seriesAFuelType,
+                    serviceModes = state.seriesAServiceModes,
+                    selectedIsSelf = state.seriesAIsSelf,
+                    onFuelSelected = onSeriesAFuelSelected,
+                    onServiceSelected = onSeriesAServiceSelected,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Seconda serie", fontWeight = FontWeight.SemiBold)
+                    Switch(checked = state.seriesBEnabled, onCheckedChange = onSeriesBEnabledChanged)
+                }
+                if (state.seriesBEnabled) {
+                    CompactSeriesEditor(
+                        title = "Serie B",
+                        fuelTypes = state.fuelTypes,
+                        selectedFuelType = state.seriesBFuelType,
+                        serviceModes = state.seriesBServiceModes,
+                        selectedIsSelf = state.seriesBIsSelf,
+                        onFuelSelected = onSeriesBFuelSelected,
+                        onServiceSelected = onSeriesBServiceSelected,
+                    )
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Fatto") } },
+    )
+}
+
+@Composable
+private fun CompactSeriesEditor(
     title: String,
     fuelTypes: List<String>,
     selectedFuelType: String?,
@@ -318,24 +470,15 @@ private fun SeriesConfigurator(
     onFuelSelected: (String) -> Unit,
     onServiceSelected: (Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Text("Carburante", style = MaterialTheme.typography.bodySmall)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(fuelTypes) { fuel ->
-                FilterChip(
-                    selected = fuel == selectedFuelType,
-                    onClick = { onFuelSelected(fuel) },
-                    label = { Text(fuel) },
-                )
-            }
-        }
-        Text("Servizio", style = MaterialTheme.typography.bodySmall)
+        FuelDropdown(fuelTypes, selectedFuelType, onFuelSelected)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             serviceModes.forEach { isSelf ->
                 FilterChip(
-                    selected = isSelf == selectedIsSelf,
+                    selected = selectedIsSelf == isSelf,
                     onClick = { onServiceSelected(isSelf) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     label = { Text(if (isSelf) "Self" else "Servito") },
                 )
             }
@@ -344,73 +487,82 @@ private fun SeriesConfigurator(
 }
 
 @Composable
-private fun PeriodChip(
-    label: String,
-    period: HistoryPeriod,
-    selected: HistoryPeriod,
-    onPeriodChanged: (HistoryPeriod) -> Unit,
+private fun FuelDropdown(
+    fuelTypes: List<String>,
+    selectedFuelType: String?,
+    onFuelSelected: (String) -> Unit,
 ) {
-    FilterChip(
-        selected = period == selected,
-        onClick = { onPeriodChanged(period) },
-        label = { Text(label) },
-    )
-}
-
-@Composable
-private fun HistoryFilterSection(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        content()
-    }
-}
-
-@Composable
-private fun PriceHistoryChartCard(
-    seriesA: List<PriceHistoryPoint>,
-    seriesB: List<PriceHistoryPoint>,
-    labelA: String,
-    labelB: String,
-    seriesBEnabled: Boolean,
-) {
-    val normalized = remember(seriesA, seriesB) { normalizeHistorySeries(seriesA, seriesB) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            enabled = fuelTypes.isNotEmpty(),
         ) {
-            if (normalized.minPrice != null && normalized.maxPrice != null) {
-                Text(
-                    text = "${formatPrice(normalized.minPrice)} – ${formatPrice(normalized.maxPrice)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+            Text((selectedFuelType ?: "Carburante") + "  ▾")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            fuelTypes.forEach { fuel ->
+                DropdownMenuItem(
+                    text = { Text(fuel) },
+                    onClick = {
+                        expanded = false
+                        onFuelSelected(fuel)
+                    },
                 )
             }
-            PriceHistoryChart(normalized)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("● $labelA", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                if (seriesBEnabled) {
-                    Text("● $labelB", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            Text(
-                text = "${seriesA.size} punti Serie A" + if (seriesBEnabled) " · ${seriesB.size} punti Serie B" else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
 
 @Composable
-private fun PriceHistoryChart(normalized: NormalizedHistorySeries) {
+private fun HistoryDataDialog(
+    seriesA: List<PriceHistoryPoint>,
+    seriesB: List<PriceHistoryPoint>,
+    labelA: String,
+    labelB: String,
+    showSeriesB: Boolean,
+    onDismiss: () -> Unit,
+) {
+    val rows = remember(seriesA, seriesB) { mergeHistorySeriesRows(seriesA, seriesB) }.asReversed()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Dati storici") },
+        text = {
+            if (rows.isEmpty()) {
+                Text("Nessuna osservazione nel periodo selezionato.")
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(rows, key = { it.observedOn.toEpochDay() }) { row ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(row.observedOn.format(HistoryDayFormatter), fontWeight = FontWeight.SemiBold)
+                                Text("$labelA: ${row.seriesAPriceMilliEuroPerUnit?.let(::formatPrice) ?: "—"}")
+                                if (showSeriesB) {
+                                    Text("$labelB: ${row.seriesBPriceMilliEuroPerUnit?.let(::formatPrice) ?: "—"}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Chiudi") } },
+    )
+}
+
+@Composable
+private fun PriceHistoryChart(normalized: NormalizedHistorySeries, modifier: Modifier = Modifier) {
     val colorA = MaterialTheme.colorScheme.primary
     val colorB = MaterialTheme.colorScheme.tertiary
     val gridColor = MaterialTheme.colorScheme.outlineVariant
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
+    Canvas(modifier = modifier) {
         val horizontalPadding = 12.dp.toPx()
-        val verticalPadding = 14.dp.toPx()
+        val verticalPadding = 12.dp.toPx()
         val plotWidth = (size.width - horizontalPadding * 2).coerceAtLeast(1f)
         val plotHeight = (size.height - verticalPadding * 2).coerceAtLeast(1f)
 
@@ -444,26 +596,14 @@ private fun PriceHistoryChart(normalized: NormalizedHistorySeries) {
     }
 }
 
-@Composable
-private fun HistoryTableHeader(labelA: String, labelB: String?) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Data · $labelA" + (labelB?.let { " · $it" } ?: ""), fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun HistoryTableDataRow(row: HistoryTableRow, showSeriesB: Boolean) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(row.communicatedAt.format(HistoryDateFormatter), style = MaterialTheme.typography.bodySmall)
-            Text(
-                text = "Serie A: ${row.seriesAPriceMilliEuroPerUnit?.let(::formatPrice) ?: "—"}" +
-                    if (showSeriesB) " · Serie B: ${row.seriesBPriceMilliEuroPerUnit?.let(::formatPrice) ?: "—"}" else "",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+private fun previousDeltaLabel(latest: PriceHistoryPoint?, previous: PriceHistoryPoint?): String {
+    if (latest == null) return "Nessun dato"
+    if (previous == null) return "Prima osservazione"
+    val delta = latest.priceMilliEuroPerUnit - previous.priceMilliEuroPerUnit
+    return when {
+        delta == 0L -> "= precedente"
+        delta > 0L -> "+${String.format(Locale.ITALY, "%.3f", delta / 1_000.0)} €"
+        else -> "${String.format(Locale.ITALY, "%.3f", delta / 1_000.0)} €"
     }
 }
 

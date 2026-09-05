@@ -1,21 +1,17 @@
 package com.archimede.w2full.ui.settings
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,15 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archimede.w2full.BuildConfig
 import com.archimede.w2full.W2FullApplication
-import com.archimede.w2full.ui.history.HistoryPeriod
-import com.archimede.w2full.ui.stations.StationListPreferences
-import com.archimede.w2full.ui.stations.StationSortMode
 import com.archimede.w2full.ui.vehicle.VehicleSettingsRoute
 import java.util.Locale
 
@@ -45,8 +37,6 @@ private enum class SettingsPage {
     HOME,
     VEHICLE,
     FAVORITES,
-    STATIONS,
-    HISTORY,
     INFO,
 }
 
@@ -77,20 +67,6 @@ fun SettingsRoute() {
             onBack = { page = SettingsPage.HOME },
             onRemove = viewModel::removeFavorite,
         )
-        SettingsPage.STATIONS -> StationDefaultsScreen(
-            state = state,
-            onBack = { page = SettingsPage.HOME },
-            onRadiusEnabled = viewModel::setRadiusEnabled,
-            onRadiusKm = viewModel::setRadiusKm,
-            onSortMode = viewModel::setStationSortMode,
-        )
-        SettingsPage.HISTORY -> HistoryDefaultsScreen(
-            state = state,
-            onBack = { page = SettingsPage.HOME },
-            onPeriod = viewModel::setHistoryPeriod,
-            onSeriesBEnabled = viewModel::setSeriesBEnabled,
-            onShowTable = viewModel::setShowTable,
-        )
         SettingsPage.INFO -> InfoSettingsScreen(onBack = { page = SettingsPage.HOME })
     }
 }
@@ -98,29 +74,58 @@ fun SettingsRoute() {
 @Composable
 private fun SettingsHome(onOpen: (SettingsPage) -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("⚙ Impostazioni", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(
-            "Tutte le configurazioni di W2Full in un unico posto.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SettingsCard("🚗", "Veicolo", "Carburante predefinito e dati veicolo") { onOpen(SettingsPage.VEHICLE) }
-        SettingsCard("★", "Stazioni preferite", "Visualizza e rimuovi le tue preferite") { onOpen(SettingsPage.FAVORITES) }
-        SettingsCard("⛽", "Stazioni", "Raggio e ordinamento predefiniti") { onOpen(SettingsPage.STATIONS) }
-        SettingsCard("📈", "Storico", "Periodo e opzioni del grafico") { onOpen(SettingsPage.HISTORY) }
-        SettingsCard("ⓘ", "Informazioni", "Versione dell'app") { onOpen(SettingsPage.INFO) }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("⚙ Impostazioni", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Solo le impostazioni globali. I filtri restano dove li usi.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        SettingsCard(
+            icon = "🚗",
+            title = "Veicolo",
+            subtitle = "Carburante predefinito e dati della tua auto",
+            modifier = Modifier.weight(1f),
+        ) { onOpen(SettingsPage.VEHICLE) }
+        SettingsCard(
+            icon = "★",
+            title = "Stazioni preferite",
+            subtitle = "Gestisci le stazioni che vuoi seguire",
+            modifier = Modifier.weight(1f),
+        ) { onOpen(SettingsPage.FAVORITES) }
+        SettingsCard(
+            icon = "ⓘ",
+            title = "Informazioni",
+            subtitle = "Versione, dati MIMIT e privacy locale",
+            modifier = Modifier.weight(1f),
+        ) { onOpen(SettingsPage.INFO) }
     }
 }
 
 @Composable
-private fun SettingsCard(icon: String, title: String, subtitle: String, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("$icon  $title", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onClick) { Text("Apri") }
+private fun SettingsCard(
+    icon: String,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Card(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(icon, style = MaterialTheme.typography.headlineMedium)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("›", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -132,147 +137,46 @@ private fun FavoritesSettingsScreen(
     onRemove: (Long) -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         BackHeader("Stazioni preferite", onBack)
-        if (state.favorites.isEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Text("Nessuna stazione preferita. Usa la stella nella schermata Stazioni.", modifier = Modifier.padding(16.dp))
-            }
-        } else {
-            state.favorites.forEach { item ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(item.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        if (item.address.isNotBlank()) {
-                            Text(item.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        item.distanceKm?.let {
-                            Text(String.format(Locale.ITALY, "%.1f km", it), color = MaterialTheme.colorScheme.primary)
-                        }
-                        TextButton(onClick = { onRemove(item.stationId) }) { Text("Rimuovi dai preferiti") }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StationDefaultsScreen(
-    state: SettingsUiState,
-    onBack: () -> Unit,
-    onRadiusEnabled: (Boolean) -> Unit,
-    onRadiusKm: (Int) -> Unit,
-    onSortMode: (StationSortMode) -> Unit,
-) {
-    val prefs = state.stationPreferences
-    var radiusText by remember(prefs.radiusKm) { mutableStateOf(prefs.radiusKm.toString()) }
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        BackHeader("Impostazioni Stazioni", onBack)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Limita distanza")
-                    Switch(checked = prefs.radiusEnabled, onCheckedChange = onRadiusEnabled)
-                }
-                OutlinedTextField(
-                    value = radiusText,
-                    onValueChange = { value ->
-                        if (value.length <= 3 && value.all(Char::isDigit)) radiusText = value
-                    },
-                    label = { Text("Raggio massimo (km)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(onClick = {
-                    radiusText.toIntOrNull()
-                        ?.takeIf { it in StationListPreferences.MIN_RADIUS_KM..StationListPreferences.MAX_RADIUS_KM }
-                        ?.let(onRadiusKm)
-                }) { Text("Salva raggio") }
-                Text("Ordinamento predefinito", fontWeight = FontWeight.SemiBold)
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    DefaultSortChip("Distanza", StationSortMode.DISTANCE, prefs.sortMode, onSortMode)
-                    DefaultSortChip("Prezzo Self", StationSortMode.SELF_PRICE, prefs.sortMode, onSortMode)
-                    DefaultSortChip("Prezzo Servito", StationSortMode.SERVED_PRICE, prefs.sortMode, onSortMode)
-                }
-            }
-        }
-        Text("Questi valori restano modificabili rapidamente anche nella schermata Stazioni.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun DefaultSortChip(
-    label: String,
-    mode: StationSortMode,
-    selected: StationSortMode,
-    onSortMode: (StationSortMode) -> Unit,
-) {
-    FilterChip(selected = mode == selected, onClick = { onSortMode(mode) }, label = { Text(label) })
-}
-
-@Composable
-private fun HistoryDefaultsScreen(
-    state: SettingsUiState,
-    onBack: () -> Unit,
-    onPeriod: (HistoryPeriod) -> Unit,
-    onSeriesBEnabled: (Boolean) -> Unit,
-    onShowTable: (Boolean) -> Unit,
-) {
-    val prefs = state.historyPreferences
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        BackHeader("Impostazioni Storico", onBack)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Periodo predefinito", fontWeight = FontWeight.SemiBold)
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    HistoryPeriod.values().forEach { period ->
-                        FilterChip(
-                            selected = period == prefs.period,
-                            onClick = { onPeriod(period) },
-                            label = { Text(historyPeriodLabel(period)) },
-                        )
-                    }
-                }
-                SettingsSwitch("Seconda serie attiva", prefs.seriesBEnabled, onSeriesBEnabled)
-                SettingsSwitch("Mostra tabella dati", prefs.showTable, onShowTable)
-            }
-        }
         Text(
-            "Carburante e servizio di Serie A e Serie B si scelgono direttamente nello Storico, perché dipendono dai dati disponibili della stazione.",
+            "Aggiungile o toglile anche dalla stella grande nella schermata Stazioni.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
 
-@Composable
-private fun SettingsSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label)
-        Switch(checked = checked, onCheckedChange = onChange)
+        if (state.favorites.isEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text("Nessuna stazione preferita.", modifier = Modifier.padding(16.dp))
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(state.favorites, key = { it.stationId }) { item ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(item.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            if (item.address.isNotBlank()) {
+                                Text(item.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            item.distanceKm?.let {
+                                Text(String.format(Locale.ITALY, "%.1f km", it), color = MaterialTheme.colorScheme.primary)
+                            }
+                            Button(
+                                onClick = { onRemove(item.stationId) },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            ) {
+                                Text("★ Rimuovi dai preferiti")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -281,7 +185,7 @@ private fun InfoSettingsScreen(onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         BackHeader("Informazioni", onBack)
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("W2Full", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("Versione ${BuildConfig.VERSION_NAME}")
                 Text("Dati carburanti: dataset ufficiali MIMIT", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -293,16 +197,12 @@ private fun InfoSettingsScreen(onBack: () -> Unit) {
 
 @Composable
 private fun BackHeader(title: String, onBack: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton(onClick = onBack) { Text("← Impostazioni") }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text("←") }
         Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     }
-}
-
-private fun historyPeriodLabel(period: HistoryPeriod): String = when (period) {
-    HistoryPeriod.ONE_MONTH -> "1 mese"
-    HistoryPeriod.THREE_MONTHS -> "3 mesi"
-    HistoryPeriod.SIX_MONTHS -> "6 mesi"
-    HistoryPeriod.ONE_YEAR -> "1 anno"
-    HistoryPeriod.ALL -> "Tutto"
 }

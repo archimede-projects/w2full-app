@@ -1,7 +1,6 @@
 package com.archimede.w2full.ui.history
 
 import com.archimede.w2full.data.repository.PriceHistoryPoint
-import java.time.ZoneOffset
 
 data class NormalizedPricePoint(
     val xFraction: Float,
@@ -39,14 +38,14 @@ internal fun normalizeHistorySeries(
 
     val minPrice = all.minOf { it.priceMilliEuroPerUnit }
     val maxPrice = all.maxOf { it.priceMilliEuroPerUnit }
-    val minTime = all.minOf { it.communicatedAt.toEpochSecond(ZoneOffset.UTC) }
-    val maxTime = all.maxOf { it.communicatedAt.toEpochSecond(ZoneOffset.UTC) }
+    val minDay = all.minOf { it.observedOn.toEpochDay() }
+    val maxDay = all.maxOf { it.observedOn.toEpochDay() }
     val priceRange = maxPrice - minPrice
-    val timeRange = maxTime - minTime
+    val dayRange = maxDay - minDay
 
     fun normalize(points: List<PriceHistoryPoint>): List<NormalizedPricePoint> = points.map { point ->
-        val epoch = point.communicatedAt.toEpochSecond(ZoneOffset.UTC)
-        val x = if (timeRange == 0L) 0.5f else (epoch - minTime).toFloat() / timeRange.toFloat()
+        val day = point.observedOn.toEpochDay()
+        val x = if (dayRange == 0L) 0.5f else (day - minDay).toFloat() / dayRange.toFloat()
         val y = if (priceRange == 0L) {
             0.5f
         } else {
