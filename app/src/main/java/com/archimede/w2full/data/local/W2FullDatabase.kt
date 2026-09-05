@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MimitPriceEntity::class,
         MimitPriceHistoryEntity::class,
         MimitSyncStateEntity::class,
+        PriceAlertRuleEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class W2FullDatabase : RoomDatabase() {
@@ -25,6 +26,8 @@ abstract class W2FullDatabase : RoomDatabase() {
     abstract fun rifornimentoDao(): RifornimentoDao
 
     abstract fun mimitCacheDao(): MimitCacheDao
+
+    abstract fun priceAlertDao(): PriceAlertDao
 
     companion object {
         private const val DATABASE_NAME = "w2full.db"
@@ -142,6 +145,28 @@ abstract class W2FullDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `price_alert_rule` (
+                        `id` INTEGER NOT NULL,
+                        `fuel_description` TEXT NOT NULL,
+                        `max_price_milli_euro_per_unit` INTEGER NOT NULL,
+                        `is_self` INTEGER NOT NULL,
+                        `brand` TEXT NOT NULL,
+                        `radius_km` INTEGER,
+                        `is_active` INTEGER NOT NULL,
+                        `last_notified_fingerprint` TEXT,
+                        `last_notified_at_epoch_millis` INTEGER,
+                        `updated_at_epoch_millis` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: W2FullDatabase? = null
 
@@ -152,7 +177,7 @@ abstract class W2FullDatabase : RoomDatabase() {
                     W2FullDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { instance = it }
             }

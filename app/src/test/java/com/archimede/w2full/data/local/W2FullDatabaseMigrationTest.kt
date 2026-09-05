@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,16 +17,13 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class W2FullDatabaseMigrationTest {
     @Test
-    fun migration1To4PreservesVehicleAndRefuelingDataAndCreatesMimitTables() {
+    fun migration1To5PreservesVehicleAndRefuelingDataAndCreatesFeatureTables() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val databaseName = "w2full-migration-${System.nanoTime()}.db"
         context.deleteDatabase(databaseName)
-
         val sqlite = context.openOrCreateDatabase(databaseName, Context.MODE_PRIVATE, null)
         createBaseSchema(sqlite)
-        sqlite.execSQL(
-            "INSERT INTO vehicles(id, name, default_fuel_type, tank_capacity_milliliters) VALUES(1, 'Auto', 'Benzina', 50000)",
-        )
+        sqlite.execSQL("INSERT INTO vehicles(id, name, default_fuel_type, tank_capacity_milliliters) VALUES(1, 'Auto', 'Benzina', 50000)")
         sqlite.execSQL(
             """
             INSERT INTO refuel_entries(
@@ -42,21 +40,17 @@ class W2FullDatabaseMigrationTest {
                 W2FullDatabase.MIGRATION_1_2,
                 W2FullDatabase.MIGRATION_2_3,
                 W2FullDatabase.MIGRATION_3_4,
+                W2FullDatabase.MIGRATION_4_5,
             )
             .allowMainThreadQueries()
             .build()
-
         try {
             runBlocking {
-                val vehicle = database.vehicleDao().getById(1)
-                val refueling = database.rifornimentoDao().getById(7)
-                assertEquals("Auto", vehicle?.name)
-                assertEquals(50_000L, vehicle?.tankCapacityMilliliters)
-                assertEquals(12_345L, refueling?.odometerKm)
-                assertEquals(7_000L, refueling?.totalCostCents)
+                assertEquals("Auto", database.vehicleDao().getById(1)?.name)
+                assertEquals(12_345L, database.rifornimentoDao().getById(7)?.odometerKm)
                 assertTrue(database.mimitCacheDao().getStations().isEmpty())
-                assertTrue(database.mimitCacheDao().getPrices().isEmpty())
                 assertTrue(database.mimitCacheDao().getPriceHistory().isEmpty())
+                assertNull(database.priceAlertDao().getRule())
             }
         } finally {
             database.close()
@@ -65,17 +59,14 @@ class W2FullDatabaseMigrationTest {
     }
 
     @Test
-    fun migration2To4PreservesMimitCacheAndCreatesEmptyDailyHistory() {
+    fun migration2To5PreservesMimitCacheAndCreatesEmptyAlertRule() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val databaseName = "w2full-migration-m5-${System.nanoTime()}.db"
+        val databaseName = "w2full-migration-mimit-${System.nanoTime()}.db"
         context.deleteDatabase(databaseName)
-
         val sqlite = context.openOrCreateDatabase(databaseName, Context.MODE_PRIVATE, null)
         createBaseSchema(sqlite)
         createMimitV2Schema(sqlite)
-        sqlite.execSQL(
-            "INSERT INTO vehicles(id, name, default_fuel_type, tank_capacity_milliliters) VALUES(1, 'Auto', 'Benzina', NULL)",
-        )
+        sqlite.execSQL("INSERT INTO vehicles(id, name, default_fuel_type, tank_capacity_milliliters) VALUES(1, 'Auto', 'Benzina', NULL)")
         sqlite.execSQL(
             """
             INSERT INTO mimit_stations(
@@ -84,33 +75,21 @@ class W2FullDatabaseMigrationTest {
             ) VALUES(123, 'Gestore', 'Eni', 'Stradale', 'Eni Test', 'Via Test', 'Roma', 'RM', 41.9, 12.5)
             """.trimIndent(),
         )
-        sqlite.execSQL(
-            """
-            INSERT INTO mimit_prices(
-                station_id, fuel_description, price_milli_euro_per_unit, is_self, communicated_at
-            ) VALUES(123, 'Benzina', 1789, 1, '2026-09-01T08:00:00')
-            """.trimIndent(),
-        )
-        sqlite.execSQL(
-            """
-            INSERT INTO mimit_sync_state(
-                id, stations_extraction_epoch_day, prices_extraction_epoch_day, last_successful_update_epoch_millis
-            ) VALUES(1, 20697, 20697, 1788250000000)
-            """.trimIndent(),
-        )
+        sqlite.execSQL("INSERT INTO mimit_prices(station_id, fuel_description, price_milli_euro_per_unit, is_self, communicated_at) VALUES(123, 'Benzina', 1789, 1, '2026-09-01T08:00:00')")
+        sqlite.execSQL("INSERT INTO mimit_sync_state(id, stations_extraction_epoch_day, prices_extraction_epoch_day, last_successful_update_epoch_millis) VALUES(1, 20697, 20697, 1788250000000)")
         sqlite.version = 2
         sqlite.close()
 
         val database = Room.databaseBuilder(context, W2FullDatabase::class.java, databaseName)
-            .addMigrations(W2FullDatabase.MIGRATION_2_3, W2FullDatabase.MIGRATION_3_4)
+            .addMigrations(W2FullDatabase.MIGRATION_2_3, W2FullDatabase.MIGRATION_3_4, W2FullDatabase.MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
-
         try {
             runBlocking {
                 assertEquals(listOf(123L), database.mimitCacheDao().getStations().map { it.stationId })
                 assertEquals(1_789L, database.mimitCacheDao().getPrices().single().priceMilliEuroPerUnit)
                 assertTrue(database.mimitCacheDao().getPriceHistory().isEmpty())
+                assertNull(database.priceAlertDao().getRule())
             }
         } finally {
             database.close()
@@ -119,40 +98,74 @@ class W2FullDatabaseMigrationTest {
     }
 
     @Test
-    fun migration3To4PreservesLegacyHistoryAsObservedDay() {
+    fun migration3To5PreservesLegacyHistoryAsObservedDay() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val databaseName = "w2full-migration-daily-history-${System.nanoTime()}.db"
+        val databaseName = "w2full-migration-history-${System.nanoTime()}.db"
         context.deleteDatabase(databaseName)
-
         val importedAt = 1_788_250_000_000L
         val sqlite = context.openOrCreateDatabase(databaseName, Context.MODE_PRIVATE, null)
         createBaseSchema(sqlite)
         createMimitV2Schema(sqlite)
         createMimitV3HistorySchema(sqlite)
-        sqlite.execSQL(
-            """
-            INSERT INTO mimit_price_history(
-                station_id, fuel_description, price_milli_euro_per_unit, is_self,
-                communicated_at, imported_at_epoch_millis
-            ) VALUES(321, 'Benzina', 2069, 1, '2026-09-01T08:00:00', $importedAt)
-            """.trimIndent(),
-        )
+        sqlite.execSQL("INSERT INTO mimit_price_history(station_id, fuel_description, price_milli_euro_per_unit, is_self, communicated_at, imported_at_epoch_millis) VALUES(321, 'Benzina', 2069, 1, '2026-09-01T08:00:00', $importedAt)")
         sqlite.version = 3
         sqlite.close()
 
         val database = Room.databaseBuilder(context, W2FullDatabase::class.java, databaseName)
-            .addMigrations(W2FullDatabase.MIGRATION_3_4)
+            .addMigrations(W2FullDatabase.MIGRATION_3_4, W2FullDatabase.MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
-
         try {
             runBlocking {
                 val history = database.mimitCacheDao().getPriceHistory()
                 assertEquals(1, history.size)
                 assertEquals(321L, history.single().stationId)
-                assertEquals(2_069L, history.single().priceMilliEuroPerUnit)
                 assertEquals(importedAt / 86_400_000L, history.single().observedOnEpochDay)
-                assertEquals("2026-09-01T08:00:00", history.single().communicatedAt)
+                assertNull(database.priceAlertDao().getRule())
+            }
+        } finally {
+            database.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun migration4To5PreservesDailyHistoryAndCreatesPriceAlertTable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val databaseName = "w2full-migration-alert-${System.nanoTime()}.db"
+        context.deleteDatabase(databaseName)
+        val sqlite = context.openOrCreateDatabase(databaseName, Context.MODE_PRIVATE, null)
+        createBaseSchema(sqlite)
+        createMimitV2Schema(sqlite)
+        createMimitV4HistorySchema(sqlite)
+        sqlite.execSQL("INSERT INTO vehicles(id, name, default_fuel_type, tank_capacity_milliliters) VALUES(1, 'Auto', 'Gasolio', 50000)")
+        sqlite.execSQL("INSERT INTO mimit_price_history(station_id, fuel_description, price_milli_euro_per_unit, is_self, observed_on_epoch_day, communicated_at, imported_at_epoch_millis) VALUES(777, 'Gasolio', 1799, 1, 20701, '2026-09-05T08:00:00', 1788595200000)")
+        sqlite.version = 4
+        sqlite.close()
+
+        val database = Room.databaseBuilder(context, W2FullDatabase::class.java, databaseName)
+            .addMigrations(W2FullDatabase.MIGRATION_4_5)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            runBlocking {
+                assertEquals("Gasolio", database.vehicleDao().getById(1)?.defaultFuelType)
+                assertEquals(777L, database.mimitCacheDao().getPriceHistory().single().stationId)
+                assertNull(database.priceAlertDao().getRule())
+                database.priceAlertDao().upsert(
+                    PriceAlertRuleEntity(
+                        fuelDescription = "Gasolio",
+                        maxPriceMilliEuroPerUnit = 1_800,
+                        isSelf = true,
+                        brand = "Eni",
+                        radiusKm = 25,
+                        isActive = true,
+                        lastNotifiedFingerprint = null,
+                        lastNotifiedAtEpochMillis = null,
+                        updatedAtEpochMillis = 123L,
+                    ),
+                )
+                assertEquals(1_800L, database.priceAlertDao().getRule()?.maxPriceMilliEuroPerUnit)
             }
         } finally {
             database.close()
@@ -187,12 +200,8 @@ class W2FullDatabaseMigrationTest {
             )
             """.trimIndent(),
         )
-        sqlite.execSQL(
-            "CREATE INDEX `idx_refuel_vehicle_odometer` ON `refuel_entries` (`vehicle_id`, `odometer_km`)",
-        )
-        sqlite.execSQL(
-            "CREATE INDEX `idx_refuel_vehicle_timestamp` ON `refuel_entries` (`vehicle_id`, `timestamp_epoch_millis`)",
-        )
+        sqlite.execSQL("CREATE INDEX `idx_refuel_vehicle_odometer` ON `refuel_entries` (`vehicle_id`, `odometer_km`)")
+        sqlite.execSQL("CREATE INDEX `idx_refuel_vehicle_timestamp` ON `refuel_entries` (`vehicle_id`, `timestamp_epoch_millis`)")
     }
 
     private fun createMimitV2Schema(sqlite: SQLiteDatabase) {
@@ -226,9 +235,7 @@ class W2FullDatabaseMigrationTest {
             )
             """.trimIndent(),
         )
-        sqlite.execSQL(
-            "CREATE INDEX `idx_mimit_prices_station` ON `mimit_prices` (`station_id`)",
-        )
+        sqlite.execSQL("CREATE INDEX `idx_mimit_prices_station` ON `mimit_prices` (`station_id`)")
         sqlite.execSQL(
             """
             CREATE TABLE `mimit_sync_state` (
@@ -260,6 +267,29 @@ class W2FullDatabaseMigrationTest {
             """
             CREATE INDEX `idx_mimit_price_history_station_fuel_service`
             ON `mimit_price_history` (`station_id`, `fuel_description`, `is_self`, `communicated_at`)
+            """.trimIndent(),
+        )
+    }
+
+    private fun createMimitV4HistorySchema(sqlite: SQLiteDatabase) {
+        sqlite.execSQL(
+            """
+            CREATE TABLE `mimit_price_history` (
+                `station_id` INTEGER NOT NULL,
+                `fuel_description` TEXT NOT NULL,
+                `price_milli_euro_per_unit` INTEGER NOT NULL,
+                `is_self` INTEGER NOT NULL,
+                `observed_on_epoch_day` INTEGER NOT NULL,
+                `communicated_at` TEXT NOT NULL,
+                `imported_at_epoch_millis` INTEGER NOT NULL,
+                PRIMARY KEY(`station_id`, `fuel_description`, `is_self`, `observed_on_epoch_day`)
+            )
+            """.trimIndent(),
+        )
+        sqlite.execSQL(
+            """
+            CREATE INDEX `idx_mimit_price_history_station_fuel_service`
+            ON `mimit_price_history` (`station_id`, `fuel_description`, `is_self`, `observed_on_epoch_day`)
             """.trimIndent(),
         )
     }

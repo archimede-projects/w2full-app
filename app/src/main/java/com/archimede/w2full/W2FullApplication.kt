@@ -2,18 +2,23 @@ package com.archimede.w2full
 
 import android.app.Application
 import android.util.Log
+import com.archimede.w2full.alerts.AndroidPriceAlertNotifier
+import com.archimede.w2full.alerts.PriceAlertEvaluator
 import com.archimede.w2full.data.local.W2FullDatabase
 import com.archimede.w2full.data.mimit.EniStationDistanceService
 import com.archimede.w2full.data.mimit.LogcatMimitLogger
 import com.archimede.w2full.data.mimit.MimitCsvClient
 import com.archimede.w2full.data.mimit.NearbyStationsRepository
 import com.archimede.w2full.data.mimit.RoomNearbyStationsRepository
+import com.archimede.w2full.data.repository.PriceAlertRepository
 import com.archimede.w2full.data.repository.PriceHistoryRepository
 import com.archimede.w2full.data.repository.RefuelingRepository
 import com.archimede.w2full.data.repository.RoomPriceHistoryRepository
 import com.archimede.w2full.data.repository.RoomVehicleSettingsRepository
 import com.archimede.w2full.data.repository.VehicleSettingsRepository
 import com.archimede.w2full.location.FusedUserLocationProvider
+import com.archimede.w2full.location.LastForegroundLocationStore
+import com.archimede.w2full.location.SharedPreferencesLastForegroundLocationStore
 import com.archimede.w2full.sync.MimitSyncScheduler
 import com.archimede.w2full.ui.history.HistoryFavoriteStationsStore
 import com.archimede.w2full.ui.history.HistoryPreferencesStore
@@ -32,6 +37,31 @@ class W2FullApplication : Application() {
         )
     }
 
+    val lastForegroundLocationStore: LastForegroundLocationStore by lazy {
+        SharedPreferencesLastForegroundLocationStore(this)
+    }
+
+    val priceAlertRepository: PriceAlertRepository by lazy {
+        PriceAlertRepository(
+            alertDao = database.priceAlertDao(),
+            vehicleDao = database.vehicleDao(),
+            cacheDao = database.mimitCacheDao(),
+        )
+    }
+
+    private val priceAlertNotifier: AndroidPriceAlertNotifier by lazy {
+        AndroidPriceAlertNotifier(this)
+    }
+
+    val priceAlertEvaluator: PriceAlertEvaluator by lazy {
+        PriceAlertEvaluator(
+            repository = priceAlertRepository,
+            cacheDao = database.mimitCacheDao(),
+            locationStore = lastForegroundLocationStore,
+            notifier = priceAlertNotifier,
+        )
+    }
+
     val nearbyStationsRepository: NearbyStationsRepository by lazy {
         RoomNearbyStationsRepository(
             database = database,
@@ -39,9 +69,15 @@ class W2FullApplication : Application() {
             vehicleDao = database.vehicleDao(),
             dataSource = MimitCsvClient(),
             distanceService = EniStationDistanceService(
-                userLocationProvider = FusedUserLocationProvider(this),
+                userLocationProvider = FusedUserLocationProvider(
+                    context = this,
+                    onLocationAvailable = { point ->
+                        lastForegroundLocationStore.save(point, System.currentTimeMillis())
+                    },
+                ),
             ),
             logger = LogcatMimitLogger(),
+            onRefreshSuccess = { priceAlertEvaluator.evaluate() },
         )
     }
 
@@ -73,6 +109,7 @@ class W2FullApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        priceAlertNotifier.createChannel()
         try {
             MimitSyncScheduler.schedule(this)
         } catch (exception: RuntimeException) {
