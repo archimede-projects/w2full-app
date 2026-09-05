@@ -1,6 +1,6 @@
 # W2Full — Project Specification
 
-> **Fonte di verità corrente.** Tutti i requisiti, decisioni, vincoli di firma, migrazioni e verifiche documentati nella cronologia Git fino a `main` `ae1904c2889ba4d5ec35d542c1889458feeeff20` restano normativi, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 resta l'unico checkpoint attivo.
+> **Fonte di verità corrente.** Tutti i requisiti, decisioni, vincoli di firma, migrazioni e verifiche documentati nella cronologia Git fino al commit di integrazione RC2 `2055873dd0fa4fd0d075d1c6c0f8feb19c478c8c` restano normativi, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 resta l'unico checkpoint attivo.
 
 ## Stato
 
@@ -10,7 +10,7 @@
 - M7.1: **chiusa e verificata su Galaxy S25**.
 - M7.2 RC1/RC2: **FAIL UX**, sostituita da M7.4.
 - M7.4 RC1 `v0.5.3-m7.4-rc1`: tecnicamente verde ma **FAIL UX su Galaxy S25** il 5 settembre 2026.
-- M7.4 RC2: **checkpoint attivo; candidato branch tecnicamente verde, da integrare/rilasciare/provare**.
+- M7.4 RC2: **checkpoint attivo; integrata su `main` e tecnicamente verde, da rilasciare e provare su Galaxy S25**.
 
 ## Evidenza RC1 M7.4
 
@@ -203,7 +203,19 @@ Candidato branch validato:
 - public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
 - artifact `w2full-debug-apk`, ID `9965069664`, digest ZIP SHA-256 `6f2d2c7f7ffb116601e894f0a5df0053c3ae6d5bfe71c75e509f5810da1ffb69`, archivio `14523337` byte.
 
-Il commit documentale che contiene queste evidenze deve superare a sua volta la CI prima del PR.
+HEAD documentale branch prima del PR:
+- `270a64fcddeb354cad682e4c5cc5266c248a15b2`;
+- Android CI `33951900505`, job `101268153141`: **SUCCESS** completa.
+
+## 11. Integrazione RC2 su main
+
+- PR #11 `fix(m7.4): fixed-screen UX and daily price history RC2`: mergeable e limitata a M7.4 RC2;
+- squash merge eseguito bloccando l'HEAD PR `270a64fcddeb354cad682e4c5cc5266c248a15b2`;
+- commit integrazione `main`: `2055873dd0fa4fd0d075d1c6c0f8feb19c478c8c`;
+- Android CI main run `33952047282`, job `101268553839`: **SUCCESS** completa;
+- JVM tests, `assembleDebug`, verifica APK/firma e upload artifact: **SUCCESS**;
+- artifact main `w2full-debug-apk`, ID `9965159882`, digest ZIP SHA-256 `5f8a8d05c49258cbc304afb14dfaccb00676feccac34adf6a8a7182b6f0fc373`, archivio `14523337` byte;
+- la Release RC2 deve essere taggata dal commit documentale finale di `main` successivo a questa evidenza e deve superare il workflow tag-only prima della prova Galaxy S25.
 
 ## Fuori scope
 
