@@ -3,12 +3,16 @@ package com.archimede.w2full.ui.stations
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.archimede.w2full.data.mimit.EniStationDistanceRanker
 import com.archimede.w2full.data.mimit.MimitRefreshResult
 import com.archimede.w2full.data.mimit.MimitStationDistance
 import com.archimede.w2full.data.mimit.MimitStationFuelPrice
 import com.archimede.w2full.data.mimit.MimitStationPriceSelector
 import com.archimede.w2full.data.mimit.NearbyStationsRepository
 import com.archimede.w2full.data.mimit.NearbyStationsSnapshot
+import com.archimede.w2full.location.GeoPoint
+import com.archimede.w2full.location.LocationLabelResolver
+import com.archimede.w2full.location.NoOpLocationLabelResolver
 import com.archimede.w2full.location.UserLocationResult
 import com.archimede.w2full.ui.history.HistoryFavoriteStationsStore
 import com.archimede.w2full.ui.history.InMemoryHistoryFavoriteStationsStore
@@ -32,12 +36,12 @@ enum class NearbyLocationUiStatus {
 data class NearbyStationsUiState(
     val isLoading: Boolean = false,
     val stations: List<MimitStationDistance> = emptyList(),
-    // Kept for compatibility with the RC2 presentation tests. The UI no longer renders a pinned section.
     val favoriteStations: List<MimitStationDistance> = emptyList(),
     val favoriteStationIds: Set<Long> = emptySet(),
     val filteredStationCount: Int = 0,
     val totalStationCount: Int = 0,
     val locationStatus: NearbyLocationUiStatus? = null,
+    val locationLabel: String? = null,
     val extractionDate: LocalDate? = null,
     val pricesExtractionDate: LocalDate? = null,
     val lastSuccessfulUpdateEpochMillis: Long? = null,
@@ -80,6 +84,7 @@ class NearbyStationsViewModel(
     private val repository: NearbyStationsRepository,
     private val preferencesStore: StationListPreferencesStore = InMemoryStationListPreferencesStore(),
     private val favoriteStationsStore: HistoryFavoriteStationsStore = InMemoryHistoryFavoriteStationsStore(),
+    private val locationLabelResolver: LocationLabelResolver = NoOpLocationLabelResolver,
 ) : ViewModel() {
     private var stationPreferences = preferencesStore.load()
     private var favoriteStationIds = favoriteStationsStore.load()
@@ -98,8 +103,10 @@ class NearbyStationsViewModel(
     private var sourceStations: List<MimitStationDistance> = emptyList()
     private var sourcePricesByStationId: Map<Long, MimitStationFuelPrice> = emptyMap()
     private var sourceLocationStatus: NearbyLocationUiStatus? = null
+    private var lastAvailableLocation: GeoPoint? = null
     private var refreshJob: Job? = null
     private var locationJob: Job? = null
+    private var locationLabelJob: Job? = null
     private var hasLoadedOnce = false
     private var initialPermissionPromptConsumed = false
 
@@ -119,7 +126,11 @@ class NearbyStationsViewModel(
 
     fun loadIfNeeded() {
         reloadLocalPreferences()
-        if (!hasLoadedOnce) refresh()
+        if (!hasLoadedOnce) {
+            refresh()
+        } else {
+            refreshLocation()
+        }
     }
 
     fun reloadLocalPreferences() {
@@ -168,20 +179,15 @@ class NearbyStationsViewModel(
         _uiState.value = _uiState.value.copy(locationStatus = null)
         locationJob = viewModelScope.launch {
             try {
-                val cachedSnapshot = repository.loadCachedSnapshot()
-                if (cachedSnapshot != null) {
-                    applySnapshot(cachedSnapshot)
-                } else {
-                    sourceLocationStatus = repository.resolveLocation().toUiStatus()
-                    _uiState.value = _uiState.value.copy(locationStatus = sourceLocationStatus)
-                    recomputeDisplayedStations()
+                when (val result = repository.resolveLocation()) {
+                    is UserLocationResult.Available -> applyFreshLocation(result.point)
+                    UserLocationResult.PermissionDenied -> applyUnavailableLocation(NearbyLocationUiStatus.PERMISSION_DENIED)
+                    UserLocationResult.Unavailable -> applyUnavailableLocation(NearbyLocationUiStatus.UNAVAILABLE)
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
-                sourceLocationStatus = NearbyLocationUiStatus.UNAVAILABLE
-                _uiState.value = _uiState.value.copy(locationStatus = NearbyLocationUiStatus.UNAVAILABLE)
-                recomputeDisplayedStations()
+                applyUnavailableLocation(NearbyLocationUiStatus.UNAVAILABLE)
             }
         }
     }
@@ -238,9 +244,22 @@ class NearbyStationsViewModel(
     }
 
     private fun applySnapshot(snapshot: NearbyStationsSnapshot) {
-        sourceStations = snapshot.rankedStations.stations
+        val rawStations = snapshot.rankedStations.stations.map { it.station }
+        val snapshotLocation = snapshot.rankedStations.locationResult
+        if (snapshotLocation is UserLocationResult.Available) {
+            lastAvailableLocation = snapshotLocation.point
+            sourceLocationStatus = NearbyLocationUiStatus.AVAILABLE
+            sourceStations = EniStationDistanceRanker.rank(rawStations, snapshotLocation.point)
+            resolveLocationLabel(snapshotLocation.point)
+        } else if (lastAvailableLocation != null) {
+            sourceLocationStatus = NearbyLocationUiStatus.AVAILABLE
+            sourceStations = EniStationDistanceRanker.rank(rawStations, lastAvailableLocation)
+        } else {
+            sourceLocationStatus = snapshotLocation.toUiStatus()
+            sourceStations = snapshot.rankedStations.stations
+        }
+
         sourcePricesByStationId = snapshot.pricesByStationId
-        sourceLocationStatus = snapshot.rankedStations.locationResult.toUiStatus()
         _uiState.value = _uiState.value.copy(
             locationStatus = sourceLocationStatus,
             extractionDate = snapshot.extractionDate,
@@ -251,6 +270,36 @@ class NearbyStationsViewModel(
             totalStationCount = sourceStations.size,
         )
         recomputeDisplayedStations()
+    }
+
+    private fun applyFreshLocation(point: GeoPoint) {
+        lastAvailableLocation = point
+        sourceLocationStatus = NearbyLocationUiStatus.AVAILABLE
+        sourceStations = EniStationDistanceRanker.rank(sourceStations.map { it.station }, point)
+        _uiState.value = _uiState.value.copy(
+            locationStatus = NearbyLocationUiStatus.AVAILABLE,
+            locationLabel = null,
+        )
+        recomputeDisplayedStations()
+        resolveLocationLabel(point)
+    }
+
+    private fun applyUnavailableLocation(status: NearbyLocationUiStatus) {
+        lastAvailableLocation = null
+        sourceLocationStatus = status
+        sourceStations = EniStationDistanceRanker.rank(sourceStations.map { it.station }, null)
+        _uiState.value = _uiState.value.copy(locationStatus = status, locationLabel = null)
+        recomputeDisplayedStations()
+    }
+
+    private fun resolveLocationLabel(point: GeoPoint) {
+        locationLabelJob?.cancel()
+        locationLabelJob = viewModelScope.launch {
+            val label = runCatching { locationLabelResolver.resolve(point) }.getOrNull()
+            if (lastAvailableLocation == point && sourceLocationStatus == NearbyLocationUiStatus.AVAILABLE) {
+                _uiState.value = _uiState.value.copy(locationLabel = label)
+            }
+        }
     }
 
     private fun recomputeDisplayedStations() {
@@ -285,11 +334,17 @@ class NearbyStationsViewModel(
         private val repository: NearbyStationsRepository,
         private val preferencesStore: StationListPreferencesStore,
         private val favoriteStationsStore: HistoryFavoriteStationsStore,
+        private val locationLabelResolver: LocationLabelResolver = NoOpLocationLabelResolver,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(NearbyStationsViewModel::class.java))
-            return NearbyStationsViewModel(repository, preferencesStore, favoriteStationsStore) as T
+            return NearbyStationsViewModel(
+                repository = repository,
+                preferencesStore = preferencesStore,
+                favoriteStationsStore = favoriteStationsStore,
+                locationLabelResolver = locationLabelResolver,
+            ) as T
         }
     }
 }
