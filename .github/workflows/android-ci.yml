@@ -19,7 +19,6 @@ on:
       - m7-station-filters
       - m7-history-favorites
       - m7.2-favorites-correction
-      - m7.4-ux-rc2
   workflow_dispatch:
 
 permissions:
