@@ -10,7 +10,7 @@
 - M7.1: **chiusa e verificata su Galaxy S25**.
 - M7.2 RC1/RC2: **FAIL UX**, sostituita da M7.4.
 - M7.4 RC1 `v0.5.3-m7.4-rc1`: tecnicamente verde ma **FAIL UX su Galaxy S25** il 5 settembre 2026.
-- M7.4 RC2: **checkpoint attivo**.
+- M7.4 RC2: **checkpoint attivo; candidato branch tecnicamente verde, da integrare/rilasciare/provare**.
 
 ## Evidenza RC1 M7.4
 
@@ -175,6 +175,35 @@ Gate:
 - CI `main` SUCCESS;
 - Release `v0.5.3-m7.4-rc2` dall'esatto SHA finale `main` con firma/hash/tag verificati;
 - M7.4 si chiude solo dopo PASS reale Galaxy S25.
+
+## 10. Implementazione candidata RC2 ed evidenze branch
+
+Contratto spec-first: commit `37f017b1b03ea534cd9a850ffef6c5bbee49a152`.
+
+Implementazione funzionale:
+- Room schema 4 con `observed_on_epoch_day` e migrazione esplicita 3→4;
+- refresh MIMIT salva una osservazione per extraction date, anche a prezzo/communication date invariati;
+- Stazioni con area superiore fissa, riepilogo filtri compatto e sola LazyColumn risultati scrollabile;
+- stella card con target 56×56 dp;
+- Storico principale non scrollabile, grafico prioritario, `Cambia`, periodi rapidi, `Confronta`, `Mostra dati` in vista dedicata;
+- home Impostazioni ridotta a Veicolo / Stazioni preferite / Informazioni;
+- versione `0.5.3-m7.4-rc2`, versionCode 12.
+
+Primo run sull'implementazione `2e4888ce578cfdf25fc1e68dcfb6449b01ea7690`:
+- Android CI `33951586680`, job `101267287499`: **FAIL** in compilazione per tre import espliciti Compose `weight`; nessun merge eseguito.
+- Correzione limitata ai tre import, commit `1ced2738dd2ef0a3f8c335bf88dc6c41ed305d77`.
+
+Candidato branch validato:
+- HEAD `1ced2738dd2ef0a3f8c335bf88dc6c41ed305d77`;
+- Android CI run `33951747398`, job `101267726357`: **SUCCESS** completa;
+- JVM tests: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- APK: **Verifies**, APK Signature Scheme v2, un signer;
+- certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact `w2full-debug-apk`, ID `9965069664`, digest ZIP SHA-256 `6f2d2c7f7ffb116601e894f0a5df0053c3ae6d5bfe71c75e509f5810da1ffb69`, archivio `14523337` byte.
+
+Il commit documentale che contiene queste evidenze deve superare a sua volta la CI prima del PR.
 
 ## Fuori scope
 
