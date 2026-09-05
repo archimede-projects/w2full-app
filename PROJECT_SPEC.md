@@ -14,6 +14,8 @@
 
 Branch: `m6-price-alerts`, derivato dall'esatto `main` verde `7c4f6b88730ed69230bfd6517752d4bf5cda83f5`.
 
+Commit spec-first: `f947c7e2f1307cdaad71af82513724ed836fb027`.
+
 ## 1. Obiettivo
 
 Permettere all'utente di configurare un avviso locale quando il prezzo Eni del carburante scelto scende sotto una soglia, sfruttando il refresh MIMIT già esistente e notifiche Android locali, senza account, backend, cloud o servizi a pagamento.
@@ -48,7 +50,7 @@ La migrazione deve essere coperta dai test esistenti e da un test specifico 4→
 
 M6 **non richiede** `ACCESS_BACKGROUND_LOCATION`.
 
-Quando la tab Stazioni ottiene una posizione valida in foreground, l'app salva localmente l'ultima posizione (`lat`, `lon`, timestamp) in storage privato.
+Quando l'app ottiene una posizione valida in foreground, salva localmente l'ultima posizione (`lat`, `lon`, timestamp) in storage privato.
 
 Per una regola con `radiusKm`:
 - l'evaluazione background usa soltanto l'ultima posizione foreground salvata;
@@ -153,13 +155,14 @@ Valutatore:
 - permesso/notifier failure → fingerprint non avanzata.
 
 Trigger:
-- worker valuta solo dopo refresh SUCCESS;
-- worker retry/failure non valuta;
-- refresh manuale SUCCESS valuta;
+- worker e refresh manuale condividono lo stesso `RoomNearbyStationsRepository.refresh()`;
+- callback di valutazione eseguita solo dopo transazione refresh MIMIT riuscita;
+- refresh fallito non raggiunge la callback;
 - salvataggio/attivazione valuta cache una volta.
 
 UI/permessi:
 - `POST_NOTIFICATIONS` presente nel Manifest;
+- `ACCESS_BACKGROUND_LOCATION` assente;
 - negazione permesso non lascia regola attiva;
 - pagina M6 raggiungibile da Impostazioni senza rendere scrollabile la home.
 
@@ -167,19 +170,47 @@ Regressioni:
 - test M3–M7.4 verdi;
 - firma persistente invariata.
 
-## 12. Gate M6
+## 12. Implementazione candidata ed evidenze branch
 
-Ordine obbligatorio:
-1. questo contratto spec-first commit;
-2. implementazione + test sul branch `m6-price-alerts`;
-3. Android CI reale branch con test/build/firma/artifact **SUCCESS**;
-4. PR limitata a M6;
-5. integrazione su `main` con expected head SHA;
-6. Android CI reale `main` **SUCCESS**;
-7. cleanup del solo trigger CI temporaneo M6;
-8. Release reale `v0.6.0-m6-rc1` dall'esatto SHA finale `main`, con tag/asset/firma/SHA-256 verificati;
-9. prova reale Galaxy S25;
-10. chiusura M6 solo dopo PASS dispositivo.
+Implementazione funzionale commit `83a317375db0260c832b3f989219a5e718f09be5`:
+- Room schema 5 e migrazione esplicita 4→5 con tabella singleton `price_alert_rule`;
+- repository regola con default carburante veicolo, validazione soglia/raggio e reset anti-spam su modifica;
+- ultima posizione foreground salvata localmente e scadenza 24 ore per valutazioni con raggio;
+- selettore candidati su cache MIMIT con carburante/modalità/soglia/raggio e Haversine;
+- fingerprint SHA-256 deterministica sugli ID stazione sotto soglia;
+- evaluator con stati inattivo, posizione mancante, nessun match, invariato, notificato e permesso bloccato;
+- canale locale `w2full_price_alerts`, NotificationCompat e tap che apre W2Full;
+- `POST_NOTIFICATIONS` richiesto on-demand su Android 13+; nessuna background-location permission;
+- valutazione dopo refresh MIMIT riuscito tramite callback comune a manuale/WorkManager e dopo salvataggio attivo;
+- Impostazioni con quarta voce `Avviso prezzo` e pagina dedicata fixed-screen;
+- versione `0.6.0-m6`, versionCode 14;
+- test M6 per migrazione, repository, policy/evaluator e Manifest.
+
+Trigger CI temporaneo branch: commit `d162afd4ae64779c98b5adf6fe75269eebd24f1e`.
+
+Gate branch reale:
+- Android CI run `33967278629`, job `101309501352`: **SUCCESS completa**;
+- JVM tests: **SUCCESS**;
+- `assembleDebug`: **SUCCESS**;
+- APK: **Verifies**, APK Signature Scheme v2, un signer;
+- certificato SHA-256 `bd7e570922bbadbe22d553bade91493d6309172a8b8d46e317db98f5f0b66265`;
+- public key SHA-256 `90e1ce512cd08a6d177bdb8199d3228ff6fb0e81adb625ad43275fc275963313`;
+- artifact `w2full-debug-apk`, ID `9969854108`, size ZIP `14612262` byte;
+- artifact ZIP SHA-256 `334f5fe5750741911cd80f73a94ea9e535c9a6089b9ffea1bbf75c5825725072`.
+
+Il presente commit documentale deve superare una seconda Android CI completa prima del PR.
+
+## 13. Gate M6
+
+Ordine obbligatorio restante:
+1. Android CI reale sul presente HEAD documentato: **pending**;
+2. PR limitata a M6;
+3. integrazione su `main` con expected head SHA;
+4. Android CI reale `main` **SUCCESS**;
+5. cleanup del solo trigger CI temporaneo M6;
+6. Release reale `v0.6.0-m6-rc1` dall'esatto SHA finale `main`, con tag/asset/firma/SHA-256 verificati;
+7. prova reale Galaxy S25;
+8. chiusura M6 solo dopo PASS dispositivo.
 
 # Rifinitura finale differita
 
