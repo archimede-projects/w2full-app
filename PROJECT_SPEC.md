@@ -1,6 +1,6 @@
 # W2Full — Project Specification
 
-> **Fonte di verità corrente.** Tutti i requisiti, decisioni, vincoli di firma, migrazioni e verifiche documentati nella cronologia Git fino al commit di integrazione RC2 `2055873dd0fa4fd0d075d1c6c0f8feb19c478c8c` restano normativi, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 resta l'unico checkpoint attivo.
+> **Fonte di verità corrente.** Tutti i requisiti, decisioni, vincoli di firma, migrazioni e verifiche documentati nella cronologia Git fino a `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea` restano normativi, salvo quanto esplicitamente sostituito qui. M6 resta non iniziata. M7.4 resta l'unico checkpoint attivo.
 
 ## Stato
 
@@ -10,7 +10,8 @@
 - M7.1: **chiusa e verificata su Galaxy S25**.
 - M7.2 RC1/RC2: **FAIL UX**, sostituita da M7.4.
 - M7.4 RC1 `v0.5.3-m7.4-rc1`: tecnicamente verde ma **FAIL UX su Galaxy S25** il 5 settembre 2026.
-- M7.4 RC2: **checkpoint attivo; integrata su `main` e tecnicamente verde, da rilasciare e provare su Galaxy S25**.
+- M7.4 RC2 `v0.5.3-m7.4-rc2`: tecnicamente verde e provata su Galaxy S25 il 5 settembre 2026; layout molto migliorato ma **non accettata come PASS finale** per bug/incompletezze su posizione e grafico.
+- M7.4 RC3: **checkpoint attivo**.
 
 ## Evidenza RC1 M7.4
 
@@ -220,25 +221,99 @@ HEAD documentale branch prima del PR:
 - artifact finale `w2full-debug-apk`, ID `9965344169`, digest ZIP SHA-256 `c965cdadb32646b289506897d7ed2c62cfb54e283b4cd91b48e09667f0d4fdaf`, archivio `14523337` byte;
 - firma finale verificata: schema v2, un signer, certificato e public key persistenti normativi.
 
-## 12. Cleanup CI e bridge one-shot Release RC2
+## 12. Release RC2 verificata e prova Galaxy S25
 
-Prima della Release viene rimosso da `.github/workflows/android-ci.yml` **solo** il trigger temporaneo `m7.4-ux-rc2`; nessuna altra manutenzione delle Actions è autorizzata. Il commit risultante su `main` deve superare Android CI completa e diventa lo **SHA sorgente esatto** della Release RC2.
+- cleanup trigger CI temporaneo su `main`: commit `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`;
+- Android CI `33954009523`, job `101273898387`: **SUCCESS** completa;
+- Release run `33954142263`, job `101274257018`: **SUCCESS** completa;
+- tag `v0.5.3-m7.4-rc2` punta direttamente a `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`;
+- Release ID `383179190`, prerelease reale;
+- APK `w2full-v0.5.3-m7.4-rc2-debug.apk`, `15109998` byte;
+- SHA-256 APK `bf5a57937978ca9517e61926774bb1a09d3192a77978df3991e578a031ace488`;
+- firma persistente verificata: v2, un signer, certificato e public key normativi;
+- branch bridge `m7.4-release-rc2` riallineato a `57dbb9f...`; workflow permanente `main` rimasto tag-only.
 
-Tag previsto: `v0.5.3-m7.4-rc2`.
+Prova reale Galaxy S25 del 5 settembre 2026:
+- **PASS parziale UX**: Stazioni compatta con sola lista scrollabile, stella grande, Impostazioni ridotta e Storico non scrollabile sono coerenti con il mockup approvato;
+- **FAIL posizione Stazioni**: la schermata può mostrare `Posizione non disponibile` e risultati remoti con distanza mancante, mentre lo Storico nella stessa sessione dispone di distanze valide; il retry posizione deve aggiornare realmente ranking/raggio;
+- **manca posizione leggibile**: quando disponibile va mostrata una posizione attuale user-facing, preferibilmente `Comune (Provincia)`; fallback `Posizione rilevata`; mai coordinate grezze nella UI principale;
+- **grafico incompleto**: mancano scala asse Y in €/L, asse X con date, selezione/tap di un giorno con valori delle serie, zoom/pan e reset zoom.
 
-Il connettore GitHub disponibile non espone una mutazione diretta per creare tag Git. È quindi autorizzato **esclusivamente per questa RC2** un bridge one-shot su branch `m7.4-release-rc2`, senza modificare il workflow permanente di `main`:
-- il branch parte dall'esatto SHA finale `main` validato dopo il cleanup del trigger CI;
-- solo la copia branch di `.github/workflows/android-release.yml` aggiunge un trigger push su `m7.4-release-rc2` e imposta `RELEASE_TAG=v0.5.3-m7.4-rc2`;
-- checkout, test, build e firma usano l'esatto SHA finale `main`, **non** il commit temporaneo del bridge;
-- `softprops/action-gh-release` crea il tag `v0.5.3-m7.4-rc2` con `target_commitish` uguale allo stesso SHA finale `main` e pubblica l'APK reale;
-- certificato e public key devono coincidere con i digest persistenti normativi;
-- dopo Release verde, il branch `m7.4-release-rc2` viene riallineato allo SHA sorgente `main`, rimuovendo dal suo stato finale il trigger temporaneo;
-- `.github/workflows/android-release.yml` su `main` resta tag-only durante tutto il processo;
-- M7.4 resta aperta fino al PASS reale Galaxy S25.
+RC2 non chiude M7.4.
+
+# M7.4 RC3 — posizione coerente + grafico interattivo
+
+Branch: `m7.4-ux-rc3`, derivato dall'esatto `main` `57dbb9f00498ffdd97ba9e8fd78b1bb5333e0dea`.
+
+## 13. Posizione Stazioni
+
+- `Riprova` deve richiedere una **nuova localizzazione reale** e ricalcolare le distanze sulle stazioni già in cache senza richiedere un download MIMIT.
+- Con posizione disponibile, raggio e ordinamento distanza usano immediatamente le nuove distanze; con raggio 25 km non devono restare risultati senza distanza o fuori raggio.
+- Lo stato posizione non deve rimanere incoerente con distanze appena risolte nello Storico.
+- La UI mostra una riga fissa `📍 <posizione attuale>`.
+- Posizione user-facing preferita: `Comune (Provincia)` tramite reverse geocoding di sistema; se il resolver non restituisce un nome ma le coordinate sono valide, mostra `📍 Posizione rilevata`; su permission denied/unavailable mantiene messaggio e `Riprova` appropriati.
+- Il reverse geocoding non introduce account, cloud proprietario dell'app o servizi a pagamento; eventuale indisponibilità non blocca distanze/raggio.
+
+## 14. Grafico Storico — assi e interazione
+
+Il grafico resta nella schermata non scrollabile e mantiene Serie A/B e periodi RC2.
+
+Assi:
+- asse Y visibile a sinistra con prezzo `€/L` e almeno 3–5 tick leggibili;
+- scala Y calcolata sui punti **attualmente visibili** con margine superiore/inferiore, evitando range zero;
+- asse X visibile con date compatte italiane (`3 set`, `4 set`, ecc.; includere anno quando necessario);
+- nessuna falsa interpolazione di dati mancanti.
+
+Selezione giorno:
+- tap o trascinamento orizzontale sul plot seleziona il giorno/osservazione più vicino;
+- mostra cursore/linea verticale e un tooltip/riquadro non ambiguo con data completa e valori Serie A/Serie B per quel giorno;
+- se una serie non ha osservazione in quel giorno mostra `n.d.` anziché inventare un valore;
+- il target/interazione deve essere usabile sul Galaxy S25 anche con punti ravvicinati.
+
+Zoom/pan:
+- pinch-to-zoom orizzontale sulle date;
+- quando zoomato, drag/pan orizzontale sposta la finestra temporale senza uscire dall'intervallo disponibile;
+- scala Y si ricalcola sui dati della finestra visibile;
+- doppio tap resetta zoom/pan al periodo scelto;
+- cambio periodo resetta la viewport al nuovo periodo;
+- zoom minimo = intero periodo, zoom massimo limitato per evitare viewport instabili; con meno di 2 giorni lo zoom resta disabilitato.
+
+## 15. Versione RC3
+
+- `versionCode = 13`;
+- `versionName = 0.5.3-m7.4-rc3`.
+
+## 16. Test obbligatori RC3
+
+Posizione:
+- retry chiama nuova risoluzione e aggiorna ranking/distances senza refresh dataset;
+- raggio attivo filtra correttamente dopo retry riuscito;
+- unavailable → available aggiorna UI e risultati;
+- label `Comune (Provincia)` quando risolta; fallback `Posizione rilevata` se reverse geocoder fallisce;
+- regressione permission denied/unavailable.
+
+Grafico math/interazione:
+- tick Y e range con prezzi uguali/diversi;
+- tick/date X coerenti con viewport;
+- selezione giorno più vicino;
+- merge tooltip A/B per stessa data con `n.d.` se mancante;
+- zoom clamp minimo/massimo;
+- pan clamp ai limiti;
+- reset viewport;
+- Y range calcolato solo sui punti visibili;
+- regressioni Serie A/B, periodi, storico giornaliero.
+
+Gate:
+- CI branch reale test/build/firma/artifact SUCCESS;
+- PR limitato a M7.4 RC3;
+- CI `main` SUCCESS;
+- Release `v0.5.3-m7.4-rc3` dall'esatto SHA finale `main`, tag/asset/firma/hash verificati;
+- M7.4 resta aperta fino a PASS reale Galaxy S25.
 
 ## Fuori scope
 
 - M6 notifiche soglia;
 - issue #1 `Indicazioni`;
+- backfill storico MIMIT antecedente alle osservazioni locali;
 - manutenzione CI non necessaria;
 - nuove funzioni non approvate.
