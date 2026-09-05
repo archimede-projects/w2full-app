@@ -3,6 +3,7 @@ package com.archimede.w2full.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -32,7 +33,7 @@ class PriceHistoryDaoTest {
     }
 
     @Test
-    fun historyIsDeduplicatedAndFilteredSeriesIsChronological() = runBlocking {
+    fun dailyHistoryDeduplicatesSameExtractionAndKeepsNextDayEvenWithSameCommunication() = runBlocking {
         val dao = database.mimitCacheDao()
         dao.insertStations(
             listOf(
@@ -51,27 +52,30 @@ class PriceHistoryDaoTest {
             ),
         )
 
-        val older = MimitPriceHistoryEntity(
+        val day1 = LocalDate.of(2026, 9, 1).toEpochDay()
+        val day2 = LocalDate.of(2026, 9, 2).toEpochDay()
+        val first = MimitPriceHistoryEntity(
             stationId = 10,
             fuelDescription = "Benzina",
             priceMilliEuroPerUnit = 1_750,
             isSelf = true,
-            communicatedAt = "2026-09-01T08:00:00",
+            observedOnEpochDay = day1,
+            communicatedAt = "2026-08-31T08:00:00",
             importedAtEpochMillis = 100,
         )
-        val newer = older.copy(
-            priceMilliEuroPerUnit = 1_790,
-            communicatedAt = "2026-09-02T08:00:00",
+        val nextObservationSameCommunication = first.copy(
+            priceMilliEuroPerUnit = 1_750,
+            observedOnEpochDay = day2,
             importedAtEpochMillis = 200,
         )
-        val served = newer.copy(
+        val served = first.copy(
             priceMilliEuroPerUnit = 1_890,
             isSelf = false,
             importedAtEpochMillis = 300,
         )
 
-        dao.insertPriceHistory(listOf(newer, older, served))
-        dao.insertPriceHistory(listOf(older.copy(importedAtEpochMillis = 999)))
+        dao.insertPriceHistory(listOf(nextObservationSameCommunication, first, served))
+        dao.insertPriceHistory(listOf(first.copy(priceMilliEuroPerUnit = 9_999, importedAtEpochMillis = 999)))
 
         val all = dao.getPriceHistory()
         assertEquals(3, all.size)
@@ -80,8 +84,9 @@ class PriceHistoryDaoTest {
         assertEquals(listOf(true, false), dao.observeHistoryServiceModes(10, "Benzina").first())
 
         val selfSeries = dao.observePriceHistory(10, "Benzina", true).first()
-        assertEquals(listOf(1_750L, 1_790L), selfSeries.map { it.priceMilliEuroPerUnit })
-        assertEquals(listOf("2026-09-01T08:00:00", "2026-09-02T08:00:00"), selfSeries.map { it.communicatedAt })
+        assertEquals(listOf(day1, day2), selfSeries.map { it.observedOnEpochDay })
+        assertEquals(listOf(1_750L, 1_750L), selfSeries.map { it.priceMilliEuroPerUnit })
+        assertEquals(listOf("2026-08-31T08:00:00", "2026-08-31T08:00:00"), selfSeries.map { it.communicatedAt })
         assertEquals(100L, selfSeries.first().importedAtEpochMillis)
     }
 }

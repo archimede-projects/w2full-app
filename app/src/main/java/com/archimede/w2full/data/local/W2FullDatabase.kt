@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MimitPriceHistoryEntity::class,
         MimitSyncStateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class W2FullDatabase : RoomDatabase() {
@@ -102,6 +102,46 @@ abstract class W2FullDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `mimit_price_history_new` (
+                        `station_id` INTEGER NOT NULL,
+                        `fuel_description` TEXT NOT NULL,
+                        `price_milli_euro_per_unit` INTEGER NOT NULL,
+                        `is_self` INTEGER NOT NULL,
+                        `observed_on_epoch_day` INTEGER NOT NULL,
+                        `communicated_at` TEXT NOT NULL,
+                        `imported_at_epoch_millis` INTEGER NOT NULL,
+                        PRIMARY KEY(`station_id`, `fuel_description`, `is_self`, `observed_on_epoch_day`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO `mimit_price_history_new` (
+                        `station_id`, `fuel_description`, `price_milli_euro_per_unit`, `is_self`,
+                        `observed_on_epoch_day`, `communicated_at`, `imported_at_epoch_millis`
+                    )
+                    SELECT
+                        `station_id`, `fuel_description`, `price_milli_euro_per_unit`, `is_self`,
+                        CAST(`imported_at_epoch_millis` / 86400000 AS INTEGER),
+                        `communicated_at`, `imported_at_epoch_millis`
+                    FROM `mimit_price_history`
+                    """.trimIndent(),
+                )
+                db.execSQL("DROP TABLE `mimit_price_history`")
+                db.execSQL("ALTER TABLE `mimit_price_history_new` RENAME TO `mimit_price_history`")
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS `idx_mimit_price_history_station_fuel_service`
+                    ON `mimit_price_history` (`station_id`, `fuel_description`, `is_self`, `observed_on_epoch_day`)
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var instance: W2FullDatabase? = null
 
@@ -112,7 +152,7 @@ abstract class W2FullDatabase : RoomDatabase() {
                     W2FullDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

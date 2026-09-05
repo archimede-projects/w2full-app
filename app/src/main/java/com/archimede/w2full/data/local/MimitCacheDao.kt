@@ -57,7 +57,7 @@ interface MimitCacheDao {
         WHERE station_id = :stationId
           AND fuel_description = :fuelDescription
           AND is_self = :isSelf
-        ORDER BY communicated_at ASC, imported_at_epoch_millis ASC
+        ORDER BY observed_on_epoch_day ASC, communicated_at ASC, imported_at_epoch_millis ASC
         """,
     )
     fun observePriceHistory(
@@ -75,7 +75,7 @@ interface MimitCacheDao {
     @Query(
         """
         SELECT * FROM mimit_price_history
-        ORDER BY station_id, fuel_description, is_self, communicated_at, imported_at_epoch_millis
+        ORDER BY station_id, fuel_description, is_self, observed_on_epoch_day, communicated_at, imported_at_epoch_millis
         """,
     )
     suspend fun getPriceHistory(): List<MimitPriceHistoryEntity>

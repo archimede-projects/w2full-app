@@ -5,6 +5,7 @@ import com.archimede.w2full.data.local.MimitPriceHistoryEntity
 import com.archimede.w2full.data.local.MimitStationEntity
 import com.archimede.w2full.data.local.VehicleDao
 import com.archimede.w2full.domain.model.Rifornimento
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ data class PriceHistoryPoint(
     val communicatedAt: LocalDateTime,
     val priceMilliEuroPerUnit: Long,
     val importedAtEpochMillis: Long,
+    val observedOn: LocalDate = communicatedAt.toLocalDate(),
 ) {
     val priceEuroPerUnit: Double
         get() = priceMilliEuroPerUnit / 1_000.0
@@ -83,5 +85,6 @@ class RoomPriceHistoryRepository(
         communicatedAt = LocalDateTime.parse(communicatedAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME),
         priceMilliEuroPerUnit = priceMilliEuroPerUnit,
         importedAtEpochMillis = importedAtEpochMillis,
+        observedOn = LocalDate.ofEpochDay(observedOnEpochDay),
     )
 }

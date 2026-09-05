@@ -111,10 +111,16 @@ class RoomNearbyStationsRepository(
             val stationEntities = eniStations.map { it.toEntity() }
             val priceEntities = eniPrices.map { it.toEntity() }
             val successfulAt = clock.millis()
-            val historyEntities = eniPrices.map { it.toHistoryEntity(successfulAt) }
+            val observedOnEpochDay = priceDataset.extractionDate.toEpochDay()
+            val historyEntities = eniPrices.map {
+                it.toHistoryEntity(
+                    observedOnEpochDay = observedOnEpochDay,
+                    importedAtEpochMillis = successfulAt,
+                )
+            }
             val syncState = MimitSyncStateEntity(
                 stationsExtractionEpochDay = stationDataset.extractionDate.toEpochDay(),
-                pricesExtractionEpochDay = priceDataset.extractionDate.toEpochDay(),
+                pricesExtractionEpochDay = observedOnEpochDay,
                 lastSuccessfulUpdateEpochMillis = successfulAt,
             )
 
@@ -239,15 +245,18 @@ class RoomNearbyStationsRepository(
         communicatedAt = communicatedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
     )
 
-    private fun MimitPrice.toHistoryEntity(importedAtEpochMillis: Long): MimitPriceHistoryEntity =
-        MimitPriceHistoryEntity(
-            stationId = stationId,
-            fuelDescription = fuelDescription,
-            priceMilliEuroPerUnit = priceMilliEuroPerUnit,
-            isSelf = isSelf,
-            communicatedAt = communicatedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            importedAtEpochMillis = importedAtEpochMillis,
-        )
+    private fun MimitPrice.toHistoryEntity(
+        observedOnEpochDay: Long,
+        importedAtEpochMillis: Long,
+    ): MimitPriceHistoryEntity = MimitPriceHistoryEntity(
+        stationId = stationId,
+        fuelDescription = fuelDescription,
+        priceMilliEuroPerUnit = priceMilliEuroPerUnit,
+        isSelf = isSelf,
+        observedOnEpochDay = observedOnEpochDay,
+        communicatedAt = communicatedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+        importedAtEpochMillis = importedAtEpochMillis,
+    )
 
     private fun MimitPriceEntity.toModel(): MimitPrice = MimitPrice(
         stationId = stationId,
